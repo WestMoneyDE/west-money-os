@@ -162,14 +162,36 @@ def create_checkout():
 # =============================================================================
 @app.route('/api/dashboard/stats')
 def dashboard_stats():
+    # SECURITY: Demo users see demo data, not real data
+    if session.get('user') == 'demo':
+        return jsonify({
+            'revenue': 125000, 'revenue_growth': 15.2, 'leads': 12, 'leads_growth': 8,
+            'customers': 24, 'customers_growth': 12, 'mrr': 2450, 'mrr_growth': 5.4,
+            'churn': 2.1, 'ltv': 1200, 'cac': 180, 'nps': 65
+        })
     return jsonify(DB['stats'])
 
 @app.route('/api/dashboard/charts')
 def dashboard_charts():
+    # SECURITY: Demo users see demo charts
+    if session.get('user') == 'demo':
+        return jsonify({
+            'labels': ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'],
+            'revenue': [8000, 9500, 11000, 12500, 14000, 15500, 17000, 19000, 21000, 23000, 25000, 28000],
+            'leads': [3, 4, 5, 6, 5, 7, 8, 7, 9, 10, 11, 12],
+            'mrr': [1200, 1400, 1550, 1700, 1850, 1950, 2100, 2200, 2300, 2350, 2400, 2450]
+        })
     return jsonify(DB['chart_data'])
 
 @app.route('/api/contacts')
 def get_contacts():
+    # SECURITY: Demo users see demo contacts
+    if session.get('user') == 'demo':
+        return jsonify([
+            {'id': 1, 'name': 'Demo Kontakt 1', 'email': 'demo1@example.com', 'company': 'Demo GmbH', 'phone': '+49 123 456789', 'status': 'active', 'source': 'Demo', 'created': '2025-12-01'},
+            {'id': 2, 'name': 'Demo Kontakt 2', 'email': 'demo2@example.com', 'company': 'Test AG', 'phone': '+49 987 654321', 'status': 'lead', 'source': 'Website', 'created': '2025-12-10'},
+            {'id': 3, 'name': 'Demo Kontakt 3', 'email': 'demo3@example.com', 'company': 'Sample Corp', 'phone': '+49 555 123456', 'status': 'active', 'source': 'Referral', 'created': '2025-12-15'},
+        ])
     return jsonify(DB['contacts'])
 
 @app.route('/api/contacts', methods=['POST'])
@@ -182,6 +204,12 @@ def create_contact():
 
 @app.route('/api/leads')
 def get_leads():
+    # SECURITY: Demo users see demo leads
+    if session.get('user') == 'demo':
+        return jsonify([
+            {'id': 1, 'name': 'Demo Projekt A', 'company': 'Demo Kunde', 'contact': 'Max Demo', 'email': 'max@demo.de', 'value': 25000, 'stage': 'proposal', 'probability': 60},
+            {'id': 2, 'name': 'Demo Projekt B', 'company': 'Test Firma', 'contact': 'Lisa Test', 'email': 'lisa@test.de', 'value': 45000, 'stage': 'qualified', 'probability': 40},
+        ])
     return jsonify(DB['leads'])
 
 @app.route('/api/leads', methods=['POST'])
