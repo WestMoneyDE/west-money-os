@@ -1,0 +1,42 @@
+{
+  "name": "westmoney-whatsapp-bot",
+  "version": "3.2.0",
+  "description": "West Money OS WhatsApp Business Bot - Based on Jasper's Market",
+  "main": "westmoney-whatsapp-bot.js",
+  "scripts": {
+    "start": "node westmoney-whatsapp-bot.js",
+    "dev": "nodemon westmoney-whatsapp-bot.js",
+    "templates": "bash templates.sh",
+    "test": "jest"
+  },
+  "keywords": [
+    "whatsapp",
+    "business",
+    "api",
+    "west-money",
+    "hubspot",
+    "crm",
+    "loxone",
+    "smart-home"
+  ],
+  "author": "Ömer Hüseyin Coşkun <info@west-money.com>",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/enterprise-universe/westmoney-whatsapp-bot.git"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "body-parser": "^1.20.2",
+    "axios": "^1.6.2",
+    "redis": "^4.6.10",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2",
+    "jest": "^29.7.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
