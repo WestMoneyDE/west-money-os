@@ -44,6 +44,8 @@ class User(db.Model):
     tokens_dedsec = db.Column(db.Integer, default=50)
     tokens_og = db.Column(db.Integer, default=25)
     tokens_tower = db.Column(db.Integer, default=10)
+    phone = db.Column(db.String(20))
+    hubspot_id = db.Column(db.String(50))
     avatar = db.Column(db.String(255), default='')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime)
@@ -65,6 +67,7 @@ class Contact(db.Model):
     company = db.Column(db.String(120))
     position = db.Column(db.String(100))
     whatsapp_consent = db.Column(db.Boolean, default=False)
+    hubspot_id = db.Column(db.String(50))
     tags = db.Column(db.Text, default='[]')
     notes = db.Column(db.Text)
     source = db.Column(db.String(50))
@@ -1828,6 +1831,740 @@ def api_delete_account():
     logger.info(f"Account deleted: User ID {user.id}")
     
     return jsonify({'success': True, 'message': 'Konto und alle Daten wurden gelöscht'})
+# =============================================================================
+# WHATSAPP AUTHENTICATION & HUBSPOT CONSENT SYNC
+# Enterprise Universe GmbH © 2025
+# =============================================================================
+
+import hmac
+import hashlib
+import time
+import secrets
+from datetime import datetime, timedelta
+
+# =============================================================================
+# WHATSAPP OTP VERIFICATION MODEL
+# =============================================================================
+class WhatsAppOTP(db.Model):
+    __tablename__ = 'whatsapp_otps'
+    id = db.Column(db.Integer, primary_key=True)
+    phone = db.Column(db.String(20), nullable=False)
+    otp_code = db.Column(db.String(6), nullable=False)
+    purpose = db.Column(db.String(50), default='login')  # login, register, consent, verify
+    expires_at = db.Column(db.DateTime, nullable=False)
+    verified = db.Column(db.Boolean, default=False)
+    attempts = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def is_valid(self):
+        return not self.verified and self.attempts < 3 and datetime.utcnow() < self.expires_at
+
+# =============================================================================
+# WHATSAPP CONSENT LOG MODEL
+# =============================================================================
+class WhatsAppConsentLog(db.Model):
+    __tablename__ = 'whatsapp_consent_logs'
+    id = db.Column(db.Integer, primary_key=True)
+    contact_id = db.Column(db.Integer, db.ForeignKey('contacts.id'))
+    phone = db.Column(db.String(20), nullable=False)
+    consent_status = db.Column(db.Boolean, nullable=False)
+    consent_source = db.Column(db.String(50))  # web_form, whatsapp_reply, hubspot_sync, bulk_update
+    ip_address = db.Column(db.String(50))
+    user_agent = db.Column(db.String(255))
+    hubspot_synced = db.Column(db.Boolean, default=False)
+    hubspot_sync_at = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+# =============================================================================
+# WHATSAPP OTP GENERATION & SENDING
+# =============================================================================
+def generate_otp():
+    """Generate 6-digit OTP"""
+    return ''.join([str(secrets.randbelow(10)) for _ in range(6)])
+
+def send_whatsapp_otp(phone, otp_code, purpose='verify'):
+    """Send OTP via WhatsApp Business API"""
+    token = os.getenv('WHATSAPP_TOKEN')
+    phone_id = os.getenv('WHATSAPP_PHONE_ID')
+    
+    if not token or not phone_id:
+        logger.warning("WhatsApp not configured - OTP not sent")
+        return False
+    
+    # Format phone number (remove + and spaces)
+    clean_phone = ''.join(filter(str.isdigit, phone))
+    
+    # Message templates based on purpose
+    templates = {
+        'login': f"🔐 Dein West Money OS Login-Code: *{otp_code}*\n\nGültig für 5 Minuten.\n\n_Falls du diesen Code nicht angefordert hast, ignoriere diese Nachricht._",
+        'register': f"👋 Willkommen bei West Money OS!\n\nDein Registrierungs-Code: *{otp_code}*\n\nGültig für 10 Minuten.",
+        'consent': f"✅ WhatsApp Marketing Opt-In\n\nBestätigungscode: *{otp_code}*\n\nMit der Eingabe dieses Codes stimmst du zu, Marketing-Nachrichten von Enterprise Universe GmbH zu erhalten.",
+        'verify': f"📱 Dein Verifizierungscode: *{otp_code}*\n\nGültig für 5 Minuten."
+    }
+    
+    message = templates.get(purpose, templates['verify'])
+    
+    try:
+        url = f"https://graph.facebook.com/v18.0/{phone_id}/messages"
+        headers = {
+            'Authorization': f'Bearer {token}',
+            'Content-Type': 'application/json'
+        }
+        payload = {
+            "messaging_product": "whatsapp",
+            "to": clean_phone,
+            "type": "text",
+            "text": {"body": message}
+        }
+        
+        response = requests.post(url, headers=headers, json=payload, timeout=10)
+        
+        if response.status_code == 200:
+            logger.info(f"WhatsApp OTP sent to {clean_phone[:4]}***")
+            return True
+        else:
+            logger.error(f"WhatsApp API error: {response.status_code} - {response.text}")
+            return False
+            
+    except Exception as e:
+        logger.error(f"WhatsApp send error: {e}")
+        return False
+
+# =============================================================================
+# WHATSAPP AUTH ROUTES
+# =============================================================================
+@app.route('/auth/whatsapp')
+def whatsapp_auth_page():
+    """WhatsApp Authentication Landing Page"""
+    html = '''<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Login - West Money OS</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; color: #fff; }
+        .auth-container { width: 100%; max-width: 420px; padding: 2rem; }
+        .auth-card { background: rgba(255,255,255,0.05); backdrop-filter: blur(20px); border-radius: 24px; padding: 2.5rem; border: 1px solid rgba(255,255,255,0.1); }
+        .logo { text-align: center; margin-bottom: 2rem; }
+        .logo h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+        .logo p { opacity: 0.7; font-size: 0.9rem; }
+        .whatsapp-icon { font-size: 4rem; margin-bottom: 1rem; }
+        .step { display: none; }
+        .step.active { display: block; }
+        .form-group { margin-bottom: 1.5rem; }
+        .form-label { display: block; margin-bottom: 0.5rem; font-weight: 500; }
+        .form-input { width: 100%; padding: 1rem; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; color: #fff; font-size: 1rem; }
+        .form-input:focus { outline: none; border-color: #25D366; }
+        .phone-input { display: flex; gap: 0.5rem; }
+        .country-code { width: 80px; text-align: center; }
+        .btn { width: 100%; padding: 1rem; border: none; border-radius: 12px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: 0.3s; }
+        .btn-whatsapp { background: #25D366; color: #fff; }
+        .btn-whatsapp:hover { background: #128C7E; }
+        .btn-secondary { background: rgba(255,255,255,0.1); color: #fff; margin-top: 1rem; }
+        .otp-inputs { display: flex; gap: 0.5rem; justify-content: center; margin: 1.5rem 0; }
+        .otp-input { width: 50px; height: 60px; text-align: center; font-size: 1.5rem; font-weight: 700; background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.2); border-radius: 12px; color: #fff; }
+        .otp-input:focus { outline: none; border-color: #25D366; }
+        .timer { text-align: center; margin-top: 1rem; opacity: 0.7; }
+        .resend { color: #25D366; cursor: pointer; text-decoration: underline; }
+        .error { background: rgba(239,68,68,0.2); border: 1px solid #ef4444; padding: 1rem; border-radius: 12px; margin-bottom: 1rem; }
+        .success { background: rgba(34,197,94,0.2); border: 1px solid #22c55e; padding: 1rem; border-radius: 12px; margin-bottom: 1rem; }
+        .consent-box { background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 12px; margin: 1rem 0; font-size: 0.85rem; }
+        .consent-box label { display: flex; gap: 0.75rem; cursor: pointer; }
+        .consent-box input[type="checkbox"] { width: 20px; height: 20px; }
+        .legal-links { text-align: center; margin-top: 1.5rem; font-size: 0.8rem; opacity: 0.6; }
+        .legal-links a { color: #667eea; }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-card">
+            <div class="logo">
+                <div class="whatsapp-icon">📱</div>
+                <h1>WhatsApp Login</h1>
+                <p>Schnell & sicher mit deiner Nummer</p>
+            </div>
+            
+            <div id="error-msg" class="error" style="display:none"></div>
+            <div id="success-msg" class="success" style="display:none"></div>
+            
+            <!-- Step 1: Phone Number -->
+            <div id="step1" class="step active">
+                <form onsubmit="sendOTP(event)">
+                    <div class="form-group">
+                        <label class="form-label">Telefonnummer</label>
+                        <div class="phone-input">
+                            <input type="text" class="form-input country-code" value="+49" id="country-code">
+                            <input type="tel" class="form-input" placeholder="123 456789" id="phone-number" required>
+                        </div>
+                    </div>
+                    
+                    <div class="consent-box">
+                        <label>
+                            <input type="checkbox" id="whatsapp-consent" required>
+                            <span>Ich stimme zu, dass West Money OS mir eine Verifizierungsnachricht per WhatsApp sendet. <a href="/datenschutz" target="_blank">Datenschutz</a></span>
+                        </label>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-whatsapp">
+                        📲 Code per WhatsApp senden
+                    </button>
+                </form>
+                
+                <button class="btn btn-secondary" onclick="location.href='/login'">
+                    ← Zurück zum normalen Login
+                </button>
+            </div>
+            
+            <!-- Step 2: OTP Verification -->
+            <div id="step2" class="step">
+                <p style="text-align:center;margin-bottom:1rem">Code wurde gesendet an<br><strong id="display-phone"></strong></p>
+                
+                <div class="otp-inputs">
+                    <input type="text" class="otp-input" maxlength="1" data-index="0">
+                    <input type="text" class="otp-input" maxlength="1" data-index="1">
+                    <input type="text" class="otp-input" maxlength="1" data-index="2">
+                    <input type="text" class="otp-input" maxlength="1" data-index="3">
+                    <input type="text" class="otp-input" maxlength="1" data-index="4">
+                    <input type="text" class="otp-input" maxlength="1" data-index="5">
+                </div>
+                
+                <button class="btn btn-whatsapp" onclick="verifyOTP()">
+                    ✓ Verifizieren
+                </button>
+                
+                <div class="timer" id="timer">
+                    Neuen Code anfordern in <span id="countdown">60</span>s
+                </div>
+                
+                <button class="btn btn-secondary" onclick="goBack()">
+                    ← Andere Nummer verwenden
+                </button>
+            </div>
+            
+            <div class="legal-links">
+                <a href="/impressum">Impressum</a> · 
+                <a href="/datenschutz">Datenschutz</a> · 
+                <a href="/agb">AGB</a>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+    let phoneNumber = '';
+    let countdownInterval;
+    
+    // OTP Input handling
+    document.querySelectorAll('.otp-input').forEach((input, index) => {
+        input.addEventListener('input', (e) => {
+            if (e.target.value.length === 1 && index < 5) {
+                document.querySelectorAll('.otp-input')[index + 1].focus();
+            }
+            if (document.querySelectorAll('.otp-input').length === 6) {
+                const otp = Array.from(document.querySelectorAll('.otp-input')).map(i => i.value).join('');
+                if (otp.length === 6) verifyOTP();
+            }
+        });
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Backspace' && !e.target.value && index > 0) {
+                document.querySelectorAll('.otp-input')[index - 1].focus();
+            }
+        });
+    });
+    
+    async function sendOTP(e) {
+        e.preventDefault();
+        const countryCode = document.getElementById('country-code').value;
+        const phone = document.getElementById('phone-number').value.replace(/ /g, '');
+        phoneNumber = countryCode + phone;
+        
+        try {
+            const res = await fetch('/api/auth/whatsapp/send-otp', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ phone: phoneNumber, purpose: 'login' })
+            });
+            const data = await res.json();
+            
+            if (data.success) {
+                document.getElementById('step1').classList.remove('active');
+                document.getElementById('step2').classList.add('active');
+                document.getElementById('display-phone').textContent = phoneNumber;
+                startCountdown();
+            } else {
+                showError(data.error || 'Fehler beim Senden');
+            }
+        } catch (err) {
+            showError('Verbindungsfehler');
+        }
+    }
+    
+    async function verifyOTP() {
+        const otp = Array.from(document.querySelectorAll('.otp-input')).map(i => i.value).join('');
+        if (otp.length !== 6) return;
+        
+        try {
+            const res = await fetch('/api/auth/whatsapp/verify-otp', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ phone: phoneNumber, otp: otp })
+            });
+            const data = await res.json();
+            
+            if (data.success) {
+                showSuccess('✓ Verifiziert! Weiterleitung...');
+                setTimeout(() => location.href = data.redirect || '/dashboard', 1500);
+            } else {
+                showError(data.error || 'Ungültiger Code');
+                document.querySelectorAll('.otp-input').forEach(i => i.value = '');
+                document.querySelectorAll('.otp-input')[0].focus();
+            }
+        } catch (err) {
+            showError('Verbindungsfehler');
+        }
+    }
+    
+    function startCountdown() {
+        let seconds = 60;
+        document.getElementById('countdown').textContent = seconds;
+        clearInterval(countdownInterval);
+        countdownInterval = setInterval(() => {
+            seconds--;
+            document.getElementById('countdown').textContent = seconds;
+            if (seconds <= 0) {
+                clearInterval(countdownInterval);
+                document.getElementById('timer').innerHTML = '<span class="resend" onclick="resendOTP()">Code erneut senden</span>';
+            }
+        }, 1000);
+    }
+    
+    async function resendOTP() {
+        document.getElementById('timer').innerHTML = 'Sende...';
+        await sendOTP(new Event('submit'));
+    }
+    
+    function goBack() {
+        document.getElementById('step2').classList.remove('active');
+        document.getElementById('step1').classList.add('active');
+        clearInterval(countdownInterval);
+    }
+    
+    function showError(msg) {
+        const el = document.getElementById('error-msg');
+        el.textContent = msg;
+        el.style.display = 'block';
+        setTimeout(() => el.style.display = 'none', 5000);
+    }
+    
+    function showSuccess(msg) {
+        const el = document.getElementById('success-msg');
+        el.textContent = msg;
+        el.style.display = 'block';
+    }
+    </script>
+</body>
+</html>'''
+    return Response(html, mimetype='text/html')
+
+# =============================================================================
+# WHATSAPP AUTH API ENDPOINTS
+# =============================================================================
+@app.route('/api/auth/whatsapp/send-otp', methods=['POST'])
+def api_send_whatsapp_otp():
+    """Send OTP via WhatsApp for authentication"""
+    data = request.get_json()
+    phone = data.get('phone', '').strip()
+    purpose = data.get('purpose', 'login')
+    
+    if not phone or len(phone) < 8:
+        return jsonify({'success': False, 'error': 'Ungültige Telefonnummer'})
+    
+    # Rate limiting - max 3 OTPs per phone per hour
+    recent_otps = WhatsAppOTP.query.filter(
+        WhatsAppOTP.phone == phone,
+        WhatsAppOTP.created_at > datetime.utcnow() - timedelta(hours=1)
+    ).count()
+    
+    if recent_otps >= 3:
+        return jsonify({'success': False, 'error': 'Zu viele Anfragen. Bitte warte eine Stunde.'})
+    
+    # Generate OTP
+    otp_code = generate_otp()
+    expires_minutes = 10 if purpose == 'register' else 5
+    
+    # Save to database
+    otp = WhatsAppOTP(
+        phone=phone,
+        otp_code=otp_code,
+        purpose=purpose,
+        expires_at=datetime.utcnow() + timedelta(minutes=expires_minutes)
+    )
+    db.session.add(otp)
+    db.session.commit()
+    
+    # Send via WhatsApp
+    sent = send_whatsapp_otp(phone, otp_code, purpose)
+    
+    if sent:
+        return jsonify({'success': True, 'message': 'OTP gesendet', 'expires_in': expires_minutes * 60})
+    else:
+        # For development/testing - show OTP if WhatsApp not configured
+        if not os.getenv('WHATSAPP_TOKEN'):
+            return jsonify({'success': True, 'message': 'OTP generiert (WhatsApp nicht konfiguriert)', 'dev_otp': otp_code})
+        return jsonify({'success': False, 'error': 'WhatsApp Versand fehlgeschlagen'})
+
+@app.route('/api/auth/whatsapp/verify-otp', methods=['POST'])
+def api_verify_whatsapp_otp():
+    """Verify OTP and create/login user"""
+    data = request.get_json()
+    phone = data.get('phone', '').strip()
+    otp_input = data.get('otp', '').strip()
+    
+    if not phone or not otp_input:
+        return jsonify({'success': False, 'error': 'Telefonnummer und Code erforderlich'})
+    
+    # Find valid OTP
+    otp = WhatsAppOTP.query.filter(
+        WhatsAppOTP.phone == phone,
+        WhatsAppOTP.verified == False,
+        WhatsAppOTP.expires_at > datetime.utcnow()
+    ).order_by(WhatsAppOTP.created_at.desc()).first()
+    
+    if not otp:
+        return jsonify({'success': False, 'error': 'Kein gültiger Code gefunden. Bitte neu anfordern.'})
+    
+    if otp.attempts >= 3:
+        return jsonify({'success': False, 'error': 'Zu viele Versuche. Bitte neuen Code anfordern.'})
+    
+    otp.attempts += 1
+    
+    if otp.otp_code != otp_input:
+        db.session.commit()
+        remaining = 3 - otp.attempts
+        return jsonify({'success': False, 'error': f'Ungültiger Code. Noch {remaining} Versuche.'})
+    
+    # OTP valid - mark as verified
+    otp.verified = True
+    db.session.commit()
+    
+    # Find or create user
+    user = User.query.filter_by(phone=phone).first()
+    
+    if not user:
+        # Create new user from phone
+        username = f"user_{phone[-6:]}"
+        # Ensure unique username
+        counter = 1
+        while User.query.filter_by(username=username).first():
+            username = f"user_{phone[-6:]}_{counter}"
+            counter += 1
+        
+        user = User(
+            username=username,
+            email=f"{username}@whatsapp.user",
+            phone=phone,
+            name=f"WhatsApp User",
+            role='user',
+            plan='free',
+            tokens_god=100,
+            tokens_dedsec=50
+        )
+        user.set_password(secrets.token_hex(16))  # Random password
+        db.session.add(user)
+        
+        # Log consent
+        consent_log = WhatsAppConsentLog(
+            phone=phone,
+            consent_status=True,
+            consent_source='whatsapp_auth',
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get('User-Agent', '')[:255]
+        )
+        db.session.add(consent_log)
+        db.session.commit()
+        
+        logger.info(f"New user created via WhatsApp: {username}")
+    
+    # Login user
+    session.permanent = True
+    session['user_id'] = user.id
+    user.last_login = datetime.utcnow()
+    db.session.commit()
+    
+    # Award login tokens
+    award_tokens(user.id, 'god', 5, 'whatsapp_login', 'WhatsApp Login Bonus')
+    
+    return jsonify({
+        'success': True,
+        'message': 'Erfolgreich verifiziert',
+        'redirect': '/dashboard',
+        'user': {'id': user.id, 'name': user.name}
+    })
+
+# =============================================================================
+# HUBSPOT CONSENT SYNC
+# =============================================================================
+def sync_consent_to_hubspot(contact_id, phone, consent_status):
+    """Sync WhatsApp consent to HubSpot contact"""
+    api_key = os.getenv('HUBSPOT_API_KEY')
+    
+    if not api_key:
+        logger.warning("HubSpot not configured - consent not synced")
+        return False
+    
+    try:
+        # Search for contact by phone
+        search_url = "https://api.hubapi.com/crm/v3/objects/contacts/search"
+        headers = {
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json'
+        }
+        
+        # Clean phone number for search
+        clean_phone = phone.replace('+', '').replace(' ', '')
+        
+        search_payload = {
+            "filterGroups": [{
+                "filters": [{
+                    "propertyName": "phone",
+                    "operator": "CONTAINS_TOKEN",
+                    "value": clean_phone[-10:]  # Last 10 digits
+                }]
+            }],
+            "properties": ["phone", "email", "firstname", "lastname", "hs_whatsapp_consent"]
+        }
+        
+        response = requests.post(search_url, headers=headers, json=search_payload, timeout=10)
+        
+        if response.status_code == 200:
+            results = response.json().get('results', [])
+            
+            if results:
+                hubspot_id = results[0]['id']
+                
+                # Update consent property
+                update_url = f"https://api.hubapi.com/crm/v3/objects/contacts/{hubspot_id}"
+                update_payload = {
+                    "properties": {
+                        "hs_whatsapp_consent": "GRANTED" if consent_status else "DENIED",
+                        "hs_whatsapp_consent_date": datetime.utcnow().isoformat()
+                    }
+                }
+                
+                update_response = requests.patch(update_url, headers=headers, json=update_payload, timeout=10)
+                
+                if update_response.status_code == 200:
+                    logger.info(f"HubSpot consent synced for contact {hubspot_id}")
+                    
+                    # Update our consent log
+                    consent_log = WhatsAppConsentLog.query.filter_by(
+                        contact_id=contact_id
+                    ).order_by(WhatsAppConsentLog.created_at.desc()).first()
+                    
+                    if consent_log:
+                        consent_log.hubspot_synced = True
+                        consent_log.hubspot_sync_at = datetime.utcnow()
+                        db.session.commit()
+                    
+                    return True
+                else:
+                    logger.error(f"HubSpot update failed: {update_response.status_code}")
+                    return False
+            else:
+                logger.info(f"Contact not found in HubSpot: {phone}")
+                return False
+        else:
+            logger.error(f"HubSpot search failed: {response.status_code}")
+            return False
+            
+    except Exception as e:
+        logger.error(f"HubSpot sync error: {e}")
+        return False
+
+@app.route('/api/hubspot/sync-consent', methods=['POST'])
+@login_required
+def api_hubspot_sync_consent():
+    """Manually sync all consent statuses to HubSpot"""
+    contacts = Contact.query.filter(
+        Contact.phone.isnot(None),
+        Contact.whatsapp_consent == True
+    ).all()
+    
+    synced = 0
+    failed = 0
+    
+    for contact in contacts:
+        success = sync_consent_to_hubspot(contact.id, contact.phone, contact.whatsapp_consent)
+        if success:
+            synced += 1
+        else:
+            failed += 1
+    
+    return jsonify({
+        'success': True,
+        'synced': synced,
+        'failed': failed,
+        'total': len(contacts)
+    })
+
+@app.route('/api/hubspot/import-contacts', methods=['POST'])
+@login_required
+def api_hubspot_import_contacts():
+    """Import contacts from HubSpot with consent status"""
+    api_key = os.getenv('HUBSPOT_API_KEY')
+    
+    if not api_key:
+        return jsonify({'success': False, 'error': 'HubSpot nicht konfiguriert'})
+    
+    try:
+        url = "https://api.hubapi.com/crm/v3/objects/contacts"
+        headers = {'Authorization': f'Bearer {api_key}'}
+        params = {
+            'limit': 100,
+            'properties': 'firstname,lastname,email,phone,company,hs_whatsapp_consent'
+        }
+        
+        response = requests.get(url, headers=headers, params=params, timeout=15)
+        
+        if response.status_code != 200:
+            return jsonify({'success': False, 'error': f'HubSpot API Fehler: {response.status_code}'})
+        
+        contacts_data = response.json().get('results', [])
+        imported = 0
+        updated = 0
+        
+        for hc in contacts_data:
+            props = hc.get('properties', {})
+            email = props.get('email')
+            phone = props.get('phone')
+            
+            if not email and not phone:
+                continue
+            
+            # Check if contact exists
+            existing = None
+            if email:
+                existing = Contact.query.filter_by(email=email).first()
+            if not existing and phone:
+                existing = Contact.query.filter_by(phone=phone).first()
+            
+            name = f"{props.get('firstname', '')} {props.get('lastname', '')}".strip() or 'Unbekannt'
+            consent = props.get('hs_whatsapp_consent') == 'GRANTED'
+            
+            if existing:
+                existing.name = name
+                existing.phone = phone or existing.phone
+                existing.company = props.get('company') or existing.company
+                existing.whatsapp_consent = consent
+                existing.hubspot_id = hc.get('id')
+                updated += 1
+            else:
+                contact = Contact(
+                    name=name,
+                    email=email,
+                    phone=phone,
+                    company=props.get('company'),
+                    whatsapp_consent=consent,
+                    hubspot_id=hc.get('id'),
+                    user_id=session.get('user_id')
+                )
+                db.session.add(contact)
+                imported += 1
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'imported': imported,
+            'updated': updated,
+            'total': len(contacts_data)
+        })
+        
+    except Exception as e:
+        logger.error(f"HubSpot import error: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+# =============================================================================
+# WEBHOOK FOR WHATSAPP CONSENT REPLIES
+# =============================================================================
+@app.route('/webhook/whatsapp', methods=['GET', 'POST'])
+def whatsapp_webhook():
+    """WhatsApp Business API Webhook"""
+    if request.method == 'GET':
+        # Verification challenge
+        mode = request.args.get('hub.mode')
+        token = request.args.get('hub.verify_token')
+        challenge = request.args.get('hub.challenge')
+        
+        verify_token = os.getenv('WHATSAPP_VERIFY_TOKEN', 'westmoney_verify_2025')
+        
+        if mode == 'subscribe' and token == verify_token:
+            logger.info("WhatsApp webhook verified")
+            return challenge, 200
+        return 'Forbidden', 403
+    
+    # Handle incoming messages
+    try:
+        data = request.get_json()
+        
+        if data and 'entry' in data:
+            for entry in data['entry']:
+                for change in entry.get('changes', []):
+                    value = change.get('value', {})
+                    messages = value.get('messages', [])
+                    
+                    for message in messages:
+                        phone = message.get('from')
+                        text = message.get('text', {}).get('body', '').lower().strip()
+                        
+                        # Check for consent keywords
+                        if text in ['ja', 'yes', 'ok', 'zustimmen', 'einwilligen', 'opt-in', 'start']:
+                            # Grant consent
+                            contact = Contact.query.filter_by(phone=phone).first()
+                            if contact:
+                                contact.whatsapp_consent = True
+                                
+                                # Log consent
+                                consent_log = WhatsAppConsentLog(
+                                    contact_id=contact.id,
+                                    phone=phone,
+                                    consent_status=True,
+                                    consent_source='whatsapp_reply'
+                                )
+                                db.session.add(consent_log)
+                                db.session.commit()
+                                
+                                # Sync to HubSpot
+                                sync_consent_to_hubspot(contact.id, phone, True)
+                                
+                                logger.info(f"Consent granted via WhatsApp: {phone}")
+                        
+                        elif text in ['nein', 'no', 'stop', 'abmelden', 'widerrufen', 'opt-out']:
+                            # Revoke consent
+                            contact = Contact.query.filter_by(phone=phone).first()
+                            if contact:
+                                contact.whatsapp_consent = False
+                                
+                                consent_log = WhatsAppConsentLog(
+                                    contact_id=contact.id,
+                                    phone=phone,
+                                    consent_status=False,
+                                    consent_source='whatsapp_reply'
+                                )
+                                db.session.add(consent_log)
+                                db.session.commit()
+                                
+                                sync_consent_to_hubspot(contact.id, phone, False)
+                                
+                                logger.info(f"Consent revoked via WhatsApp: {phone}")
+        
+        return 'OK', 200
+        
+    except Exception as e:
+        logger.error(f"Webhook error: {e}")
+        return 'Error', 500
 # =============================================================================
 # API ROUTES
 # =============================================================================
