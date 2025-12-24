@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
 """
 ╔═══════════════════════════════════════════════════════════════════════════════╗
-║                    WEST MONEY OS v9.1 GODMODE SUPREME                         ║
-║                      Enterprise Universe GmbH © 2025                          ║
+║            WEST MONEY OS v10.0 GODMODE ULTIMATE FINAL                        ║
+║                  Enterprise Universe GmbH © 2025                              ║
+║                                                                               ║
+║  ALL MODULES INCLUDED:                                                        ║
+║  • CRM & Contacts        • Broly Taskforce      • Einstein Agency            ║
+║  • WhatsApp Business     • DedSec Security      • Token System               ║
+║  • Stripe & Mollie       • Z Automations        • GTzMeta Gaming             ║
+║  • Revolut Banking       • Wiki & Docs          • Subscription Plans         ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝
 """
 
@@ -21,10 +27,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# =============================================================================
-# LOGGING
-# =============================================================================
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('WestMoneyOS')
 
 # =============================================================================
@@ -36,19 +39,14 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     WHATSAPP_TOKEN = os.getenv('WHATSAPP_TOKEN', '')
     WHATSAPP_PHONE_ID = os.getenv('WHATSAPP_PHONE_ID', '')
-    WHATSAPP_BUSINESS_ID = os.getenv('WHATSAPP_BUSINESS_ID', '')
     STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY', '')
     HUBSPOT_API_KEY = os.getenv('HUBSPOT_API_KEY', '')
     ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY', '')
-    CLAUDE_MODEL = os.getenv('CLAUDE_MODEL', 'claude-sonnet-4-20250514')
     REVOLUT_API_KEY = os.getenv('REVOLUT_API_KEY', '')
     MOLLIE_API_KEY = os.getenv('MOLLIE_API_KEY', '')
 
 config = Config()
 
-# =============================================================================
-# APP INITIALIZATION
-# =============================================================================
 app = Flask(__name__)
 app.config.from_object(config)
 app.permanent_session_lifetime = timedelta(days=30)
@@ -67,6 +65,10 @@ class User(db.Model):
     name = db.Column(db.String(120))
     role = db.Column(db.String(20), default='user')
     plan = db.Column(db.String(20), default='free')
+    tokens_god = db.Column(db.Integer, default=0)
+    tokens_dedsec = db.Column(db.Integer, default=0)
+    tokens_og = db.Column(db.Integer, default=0)
+    tokens_tower = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime)
     
@@ -77,8 +79,11 @@ class User(db.Model):
         return check_password_hash(self.password_hash, password)
     
     def to_dict(self):
-        return {'id': self.id, 'username': self.username, 'email': self.email, 'name': self.name, 'role': self.role, 'plan': self.plan}
-
+        return {
+            'id': self.id, 'username': self.username, 'email': self.email,
+            'name': self.name, 'role': self.role, 'plan': self.plan,
+            'tokens': {'god': self.tokens_god, 'dedsec': self.tokens_dedsec, 'og': self.tokens_og, 'tower': self.tokens_tower}
+        }
 
 class Contact(db.Model):
     __tablename__ = 'contacts'
@@ -95,8 +100,9 @@ class Contact(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     def to_dict(self):
-        return {'id': self.id, 'name': self.name, 'email': self.email, 'phone': self.phone, 'company': self.company, 'whatsapp_consent': self.whatsapp_consent, 'tags': json.loads(self.tags) if self.tags else [], 'notes': self.notes, 'source': self.source, 'created_at': self.created_at.isoformat() if self.created_at else None}
-
+        return {'id': self.id, 'name': self.name, 'email': self.email, 'phone': self.phone, 
+                'company': self.company, 'whatsapp_consent': self.whatsapp_consent,
+                'tags': json.loads(self.tags) if self.tags else [], 'source': self.source}
 
 class Lead(db.Model):
     __tablename__ = 'leads'
@@ -109,27 +115,21 @@ class Lead(db.Model):
     notes = db.Column(db.Text)
     assigned_to = db.Column(db.Integer, db.ForeignKey('users.id'))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    contact = db.relationship('Contact', backref='leads')
     
     def to_dict(self):
-        return {'id': self.id, 'title': self.title, 'contact_id': self.contact_id, 'value': self.value, 'status': self.status, 'source': self.source, 'notes': self.notes, 'created_at': self.created_at.isoformat() if self.created_at else None}
-
+        return {'id': self.id, 'title': self.title, 'value': self.value, 'status': self.status, 'source': self.source}
 
 class Campaign(db.Model):
     __tablename__ = 'campaigns'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), nullable=False)
     type = db.Column(db.String(50), default='whatsapp')
-    template_id = db.Column(db.String(100))
     status = db.Column(db.String(50), default='draft')
     sent_count = db.Column(db.Integer, default=0)
-    created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    sent_at = db.Column(db.DateTime)
     
     def to_dict(self):
-        return {'id': self.id, 'name': self.name, 'type': self.type, 'status': self.status, 'sent_count': self.sent_count, 'created_at': self.created_at.isoformat() if self.created_at else None}
-
+        return {'id': self.id, 'name': self.name, 'type': self.type, 'status': self.status, 'sent_count': self.sent_count}
 
 class Task(db.Model):
     __tablename__ = 'tasks'
@@ -143,23 +143,7 @@ class Task(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     def to_dict(self):
-        return {'id': self.id, 'title': self.title, 'description': self.description, 'due_date': self.due_date.isoformat() if self.due_date else None, 'priority': self.priority, 'status': self.status, 'created_at': self.created_at.isoformat() if self.created_at else None}
-
-
-class Message(db.Model):
-    __tablename__ = 'messages'
-    id = db.Column(db.Integer, primary_key=True)
-    contact_id = db.Column(db.Integer, db.ForeignKey('contacts.id'))
-    direction = db.Column(db.String(20))
-    type = db.Column(db.String(20), default='text')
-    content = db.Column(db.Text)
-    status = db.Column(db.String(50))
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
-    contact = db.relationship('Contact', backref='messages')
-    
-    def to_dict(self):
-        return {'id': self.id, 'contact_id': self.contact_id, 'direction': self.direction, 'type': self.type, 'content': self.content, 'status': self.status, 'timestamp': self.timestamp.isoformat() if self.timestamp else None}
-
+        return {'id': self.id, 'title': self.title, 'priority': self.priority, 'status': self.status}
 
 class Invoice(db.Model):
     __tablename__ = 'invoices'
@@ -169,29 +153,34 @@ class Invoice(db.Model):
     amount = db.Column(db.Float, nullable=False)
     tax = db.Column(db.Float, default=0)
     status = db.Column(db.String(50), default='draft')
-    due_date = db.Column(db.DateTime)
-    paid_at = db.Column(db.DateTime)
-    items = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    contact = db.relationship('Contact', backref='invoices')
     
     def to_dict(self):
-        return {'id': self.id, 'invoice_number': self.invoice_number, 'amount': self.amount, 'tax': self.tax, 'total': self.amount + self.tax, 'status': self.status, 'created_at': self.created_at.isoformat() if self.created_at else None}
+        return {'id': self.id, 'invoice_number': self.invoice_number, 'amount': self.amount, 'status': self.status}
 
+class Message(db.Model):
+    __tablename__ = 'messages'
+    id = db.Column(db.Integer, primary_key=True)
+    contact_id = db.Column(db.Integer, db.ForeignKey('contacts.id'))
+    direction = db.Column(db.String(20))
+    content = db.Column(db.Text)
+    status = db.Column(db.String(50))
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def to_dict(self):
+        return {'id': self.id, 'direction': self.direction, 'content': self.content, 'status': self.status}
 
 class Notification(db.Model):
     __tablename__ = 'notifications'
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
-    type = db.Column(db.String(50))
     title = db.Column(db.String(200))
     message = db.Column(db.Text)
     read = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     def to_dict(self):
-        return {'id': self.id, 'type': self.type, 'title': self.title, 'message': self.message, 'read': self.read, 'created_at': self.created_at.isoformat() if self.created_at else None}
-
+        return {'id': self.id, 'title': self.title, 'message': self.message, 'read': self.read}
 
 class SecurityEvent(db.Model):
     __tablename__ = 'security_events'
@@ -200,12 +189,7 @@ class SecurityEvent(db.Model):
     severity = db.Column(db.String(20))
     details = db.Column(db.Text)
     ip_address = db.Column(db.String(50))
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    def to_dict(self):
-        return {'id': self.id, 'event_type': self.event_type, 'severity': self.severity, 'ip_address': self.ip_address, 'timestamp': self.timestamp.isoformat() if self.timestamp else None}
-
 
 # =============================================================================
 # AUTH HELPERS
@@ -225,48 +209,740 @@ def login_required(f):
 
 def log_security_event(event_type, severity, details=None):
     try:
-        event = SecurityEvent(event_type=event_type, severity=severity, details=json.dumps(details) if details else None, ip_address=request.remote_addr, user_id=session.get('user_id'))
+        event = SecurityEvent(event_type=event_type, severity=severity, 
+                             details=json.dumps(details) if details else None,
+                             ip_address=request.remote_addr)
         db.session.add(event)
         db.session.commit()
-    except:
-        pass
+    except: pass
 
 # =============================================================================
 # INITIALIZE DATABASE
 # =============================================================================
 with app.app_context():
     db.create_all()
-    admin = User.query.filter_by(username='admin').first()
-    if not admin:
-        admin = User(username='admin', email='admin@west-money.com', name='Administrator', role='admin', plan='enterprise')
+    if not User.query.filter_by(username='admin').first():
+        admin = User(username='admin', email='admin@west-money.com', name='Administrator', 
+                    role='admin', plan='enterprise', tokens_god=1000, tokens_dedsec=500)
         admin.set_password('WestMoney2025!')
         db.session.add(admin)
         db.session.commit()
     logger.info("Database initialized")
 
 # =============================================================================
-# TEMPLATES
+# HTML TEMPLATES
 # =============================================================================
-try:
-    from templates import LANDING_PAGE_HTML, LOGIN_PAGE_HTML, get_dashboard_html, PRICING_PAGE_HTML
-    TEMPLATES_LOADED = True
-except:
-    TEMPLATES_LOADED = False
+LANDING_HTML = '''<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>West Money OS v10.0 | GODMODE Ultimate</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%); color: #fff; min-height: 100vh; }
+        .navbar { display: flex; justify-content: space-between; align-items: center; padding: 1rem 5%; background: rgba(0,0,0,0.3); backdrop-filter: blur(10px); position: fixed; width: 100%; top: 0; z-index: 1000; }
+        .logo { font-size: 1.5rem; font-weight: 800; background: linear-gradient(135deg, #ffd700, #ff8c00); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .nav-links { display: flex; gap: 2rem; }
+        .nav-links a { color: #fff; text-decoration: none; opacity: 0.8; transition: 0.3s; }
+        .nav-links a:hover { opacity: 1; color: #ffd700; }
+        .nav-btn { padding: 0.75rem 1.5rem; background: linear-gradient(135deg, #667eea, #764ba2); border: none; border-radius: 50px; color: #fff; font-weight: 600; cursor: pointer; text-decoration: none; }
+        .hero { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 2rem; padding-top: 5rem; }
+        .godmode-badge { background: linear-gradient(135deg, #f97316, #ef4444); padding: 0.5rem 1.5rem; border-radius: 50px; font-weight: 700; font-size: 0.875rem; margin-bottom: 2rem; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+        h1 { font-size: 4rem; margin-bottom: 1rem; }
+        h1 span { background: linear-gradient(135deg, #ffd700, #ff8c00); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .subtitle { font-size: 1.5rem; opacity: 0.8; margin-bottom: 3rem; max-width: 600px; }
+        .modules { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin: 3rem 0; max-width: 900px; }
+        .module { background: rgba(255,255,255,0.1); padding: 1rem; border-radius: 15px; backdrop-filter: blur(10px); transition: 0.3s; cursor: pointer; }
+        .module:hover { background: rgba(255,255,255,0.2); transform: translateY(-5px); }
+        .module-icon { font-size: 2rem; margin-bottom: 0.5rem; }
+        .module-name { font-weight: 600; font-size: 0.9rem; }
+        .cta-buttons { display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; }
+        .btn { padding: 1rem 2.5rem; border: none; border-radius: 50px; font-size: 1rem; font-weight: 600; cursor: pointer; text-decoration: none; transition: 0.3s; }
+        .btn-primary { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; }
+        .btn-outline { background: transparent; border: 2px solid #fff; color: #fff; }
+        .btn:hover { transform: translateY(-3px); box-shadow: 0 10px 30px rgba(102,126,234,0.4); }
+        .features { padding: 5rem 5%; background: rgba(0,0,0,0.3); }
+        .features h2 { text-align: center; font-size: 2.5rem; margin-bottom: 3rem; }
+        .features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; max-width: 1200px; margin: 0 auto; }
+        .feature-card { background: linear-gradient(135deg, rgba(102,126,234,0.2), rgba(118,75,162,0.2)); padding: 2rem; border-radius: 20px; }
+        .feature-card h3 { font-size: 1.25rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+        .feature-card p { opacity: 0.8; line-height: 1.6; }
+        .pricing { padding: 5rem 5%; }
+        .pricing h2 { text-align: center; font-size: 2.5rem; margin-bottom: 3rem; }
+        .pricing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 2rem; max-width: 1100px; margin: 0 auto; }
+        .price-card { background: rgba(255,255,255,0.1); padding: 2rem; border-radius: 20px; text-align: center; }
+        .price-card.featured { background: linear-gradient(135deg, rgba(102,126,234,0.3), rgba(118,75,162,0.3)); border: 2px solid #667eea; transform: scale(1.05); }
+        .price-name { font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem; }
+        .price-amount { font-size: 3rem; font-weight: 800; }
+        .price-period { opacity: 0.7; margin-bottom: 2rem; }
+        .price-features { list-style: none; text-align: left; margin-bottom: 2rem; }
+        .price-features li { padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        footer { padding: 3rem 5%; background: rgba(0,0,0,0.5); text-align: center; }
+        .footer-links { display: flex; justify-content: center; gap: 2rem; margin-bottom: 2rem; flex-wrap: wrap; }
+        .footer-links a { color: #fff; text-decoration: none; opacity: 0.7; }
+        .footer-links a:hover { opacity: 1; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="logo">💰 West Money OS</div>
+        <div class="nav-links">
+            <a href="#features">Features</a>
+            <a href="#pricing">Preise</a>
+            <a href="/wiki">Wiki</a>
+            <a href="/dashboard">Dashboard</a>
+        </div>
+        <div>
+            <a href="/login" class="nav-btn">Login</a>
+        </div>
+    </nav>
+    
+    <section class="hero">
+        <div class="godmode-badge">🔥 GODMODE v10.0 ULTIMATE</div>
+        <h1>💰 <span>West Money OS</span></h1>
+        <p class="subtitle">Die ultimative All-in-One Business Platform für Smart Home, CRM, FinTech, AI und Security</p>
+        
+        <div class="modules">
+            <div class="module"><div class="module-icon">📱</div><div class="module-name">WhatsApp</div></div>
+            <div class="module"><div class="module-icon">🤖</div><div class="module-name">AI Chat</div></div>
+            <div class="module"><div class="module-icon">💼</div><div class="module-name">CRM</div></div>
+            <div class="module"><div class="module-icon">💳</div><div class="module-name">Payments</div></div>
+            <div class="module"><div class="module-icon">🏦</div><div class="module-name">Banking</div></div>
+            <div class="module"><div class="module-icon">🔒</div><div class="module-name">DedSec</div></div>
+            <div class="module"><div class="module-icon">💪</div><div class="module-name">Broly</div></div>
+            <div class="module"><div class="module-icon">🧠</div><div class="module-name">Einstein</div></div>
+            <div class="module"><div class="module-icon">🪙</div><div class="module-name">Tokens</div></div>
+            <div class="module"><div class="module-icon">🏠</div><div class="module-name">LOXONE</div></div>
+            <div class="module"><div class="module-icon">🎮</div><div class="module-name">Gaming</div></div>
+            <div class="module"><div class="module-icon">📊</div><div class="module-name">Analytics</div></div>
+        </div>
+        
+        <div class="cta-buttons">
+            <a href="/register" class="btn btn-primary">🚀 Kostenlos starten</a>
+            <a href="/pricing" class="btn btn-outline">💰 Preise ansehen</a>
+        </div>
+    </section>
+    
+    <section class="features" id="features">
+        <h2>🚀 Alle Module im Überblick</h2>
+        <div class="features-grid">
+            <div class="feature-card">
+                <h3>💪 Broly Taskforce</h3>
+                <p>Legendäre Automatisierung mit unbegrenzter Power. Majin Shield, Ultra Instinct AI und GOD MODE Controller für maximale Effizienz.</p>
+            </div>
+            <div class="feature-card">
+                <h3>🧠 Einstein Agency</h3>
+                <p>8 Genius AI Bots für Architektur, Smart Home Planung und intelligente Automatisierung. Einstein University inklusive.</p>
+            </div>
+            <div class="feature-card">
+                <h3>🔐 DedSec Security</h3>
+                <p>Enterprise Security mit AR/VR Integration, 24/7 Monitoring, Anomaly Detection und Security Tower System.</p>
+            </div>
+            <div class="feature-card">
+                <h3>📱 WhatsApp Business</h3>
+                <p>Vollständige WhatsApp Business API Integration mit Consent Management, Templates und Bulk Messaging.</p>
+            </div>
+            <div class="feature-card">
+                <h3>🪙 Token Economy</h3>
+                <p>5 Token-Typen: GOD (Premium), DedSec (Security), OG (Legacy), Tower (Achievement), Ultra (Performance).</p>
+            </div>
+            <div class="feature-card">
+                <h3>🏠 Smart Home</h3>
+                <p>LOXONE Gold Partner Integration, Z Automations, ComfortClick und vollständige Gebäudeautomation.</p>
+            </div>
+        </div>
+    </section>
+    
+    <section class="pricing" id="pricing">
+        <h2>💰 Flexible Preispläne</h2>
+        <div class="pricing-grid">
+            <div class="price-card">
+                <div class="price-name">Free</div>
+                <div class="price-amount">€0</div>
+                <div class="price-period">für immer kostenlos</div>
+                <ul class="price-features">
+                    <li>✓ 100 Kontakte</li>
+                    <li>✓ Basic CRM</li>
+                    <li>✓ 5 Leads/Monat</li>
+                    <li>✓ E-Mail Support</li>
+                </ul>
+                <a href="/register" class="btn btn-outline">Kostenlos starten</a>
+            </div>
+            <div class="price-card">
+                <div class="price-name">Starter</div>
+                <div class="price-amount">€29</div>
+                <div class="price-period">pro Monat</div>
+                <ul class="price-features">
+                    <li>✓ 1.000 Kontakte</li>
+                    <li>✓ WhatsApp Business</li>
+                    <li>✓ Unbegrenzte Leads</li>
+                    <li>✓ E-Mail Kampagnen</li>
+                    <li>✓ Priority Support</li>
+                </ul>
+                <a href="/checkout?plan=starter" class="btn btn-primary">Jetzt starten</a>
+            </div>
+            <div class="price-card featured">
+                <div class="price-name">Professional</div>
+                <div class="price-amount">€99</div>
+                <div class="price-period">pro Monat</div>
+                <ul class="price-features">
+                    <li>✓ 10.000 Kontakte</li>
+                    <li>✓ AI Chatbot (Claude)</li>
+                    <li>✓ Revolut Banking</li>
+                    <li>✓ Einstein Agency</li>
+                    <li>✓ Broly Automations</li>
+                    <li>✓ API Zugang</li>
+                    <li>✓ 24/7 Support</li>
+                </ul>
+                <a href="/checkout?plan=professional" class="btn btn-primary">Beliebteste Wahl</a>
+            </div>
+            <div class="price-card">
+                <div class="price-name">Enterprise</div>
+                <div class="price-amount">€299</div>
+                <div class="price-period">pro Monat</div>
+                <ul class="price-features">
+                    <li>✓ Unbegrenzte Kontakte</li>
+                    <li>✓ White Label</li>
+                    <li>✓ DedSec Security</li>
+                    <li>✓ Custom Integration</li>
+                    <li>✓ Dedicated Manager</li>
+                    <li>✓ SLA Garantie</li>
+                </ul>
+                <a href="/contact" class="btn btn-outline">Kontaktieren</a>
+            </div>
+        </div>
+    </section>
+    
+    <footer>
+        <div class="footer-links">
+            <a href="/wiki">Wiki</a>
+            <a href="/api/docs">API Docs</a>
+            <a href="/impressum">Impressum</a>
+            <a href="/datenschutz">Datenschutz</a>
+            <a href="/agb">AGB</a>
+            <a href="/contact">Kontakt</a>
+        </div>
+        <p>© 2025 Enterprise Universe GmbH | West Money OS v10.0 GODMODE</p>
+        <p style="opacity:0.5;margin-top:1rem">Made with ❤️ in Köln | CEO: Ömer Hüseyin Coşkun</p>
+    </footer>
+</body>
+</html>'''
 
-LANDING_HTML = '''<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>West Money OS v9.1</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui;background:linear-gradient(135deg,#0f172a,#1e1b4b);color:#fff;min-height:100vh}.hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:2rem}h1{font-size:3rem;margin-bottom:1rem;background:linear-gradient(135deg,#667eea,#764ba2);-webkit-background-clip:text;-webkit-text-fill-color:transparent}.features{display:flex;gap:1rem;flex-wrap:wrap;justify-content:center;margin:2rem 0}.feature{background:rgba(255,255,255,.1);padding:1rem;border-radius:10px}.buttons{display:flex;gap:1rem}.btn{padding:1rem 2rem;border:none;border-radius:50px;font-weight:bold;cursor:pointer;text-decoration:none;color:#fff}.btn-primary{background:linear-gradient(135deg,#667eea,#764ba2)}.btn-outline{background:transparent;border:2px solid #fff}.godmode{position:fixed;top:20px;right:20px;background:linear-gradient(135deg,#f97316,#ef4444);padding:.5rem 1rem;border-radius:20px;font-weight:bold}</style></head><body><div class="godmode">🔥 GODMODE v9.1</div><div class="hero"><h1>💰 West Money OS</h1><p style="font-size:1.25rem;opacity:.8;margin-bottom:2rem">Die ultimative All-in-One Business Platform</p><div class="features"><div class="feature">📱 WhatsApp</div><div class="feature">🤖 AI Chat</div><div class="feature">💼 CRM</div><div class="feature">💳 Payments</div><div class="feature">🏦 Banking</div><div class="feature">🔒 Security</div></div><div class="buttons"><a href="/dashboard" class="btn btn-primary">Dashboard →</a><a href="/pricing" class="btn btn-outline">Preise</a></div></div></body></html>'''
+LOGIN_HTML = '''<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - West Money OS</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #0f0f1a, #1a1a2e); color: #fff; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .login-container { background: rgba(255,255,255,0.1); padding: 3rem; border-radius: 20px; width: 100%; max-width: 420px; backdrop-filter: blur(10px); }
+        .logo { text-align: center; font-size: 3rem; margin-bottom: 1rem; }
+        h1 { text-align: center; margin-bottom: 0.5rem; }
+        .version { text-align: center; color: #ffd700; margin-bottom: 2rem; }
+        .form-group { margin-bottom: 1.5rem; }
+        label { display: block; margin-bottom: 0.5rem; font-weight: 500; }
+        input { width: 100%; padding: 1rem; border: 1px solid rgba(255,255,255,0.2); border-radius: 10px; background: rgba(255,255,255,0.1); color: #fff; font-size: 1rem; }
+        input::placeholder { color: rgba(255,255,255,0.5); }
+        input:focus { outline: none; border-color: #667eea; }
+        .btn { width: 100%; padding: 1rem; border: none; border-radius: 10px; background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; font-size: 1rem; font-weight: 600; cursor: pointer; }
+        .btn:hover { opacity: 0.9; }
+        .error { background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; padding: 1rem; border-radius: 10px; margin-bottom: 1rem; text-align: center; }
+        .links { text-align: center; margin-top: 1.5rem; }
+        .links a { color: #667eea; text-decoration: none; }
+        .demo { text-align: center; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid rgba(255,255,255,0.1); opacity: 0.7; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="logo">💰</div>
+        <h1>West Money OS</h1>
+        <div class="version">GODMODE v10.0</div>
+        {error}
+        <form method="POST">
+            <div class="form-group">
+                <label>Benutzername oder E-Mail</label>
+                <input type="text" name="username" placeholder="admin" required>
+            </div>
+            <div class="form-group">
+                <label>Passwort</label>
+                <input type="password" name="password" placeholder="••••••••" required>
+            </div>
+            <button type="submit" class="btn">🚀 Einloggen</button>
+        </form>
+        <div class="links">
+            <a href="/register">Noch kein Konto? Registrieren</a>
+        </div>
+        <div class="demo">Demo-Zugang: admin / WestMoney2025!</div>
+    </div>
+</body>
+</html>'''
 
-LOGIN_HTML = '''<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Login - West Money OS</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui;background:linear-gradient(135deg,#0f172a,#1e1b4b);color:#fff;min-height:100vh;display:flex;align-items:center;justify-content:center}.login-box{background:rgba(255,255,255,.1);padding:3rem;border-radius:20px;width:100%;max-width:400px}h1{text-align:center;margin-bottom:2rem}.form-group{margin-bottom:1.5rem}label{display:block;margin-bottom:.5rem}input{width:100%;padding:1rem;border:1px solid rgba(255,255,255,.2);border-radius:10px;background:rgba(255,255,255,.1);color:#fff}.btn{width:100%;padding:1rem;border:none;border-radius:10px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;font-weight:bold;cursor:pointer}.error{background:rgba(239,68,68,.2);border:1px solid #ef4444;padding:1rem;border-radius:10px;margin-bottom:1rem}.demo{text-align:center;margin-top:1.5rem;opacity:.7}</style></head><body><div class="login-box"><h1>💰 West Money OS</h1>{error}<form method="POST"><div class="form-group"><label>Benutzername</label><input type="text" name="username" required></div><div class="form-group"><label>Passwort</label><input type="password" name="password" required></div><button type="submit" class="btn">🚀 Einloggen</button></form><p class="demo">Demo: admin / WestMoney2025!</p></div></body></html>'''
+REGISTER_HTML = '''<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registrieren - West Money OS</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #0f0f1a, #1a1a2e); color: #fff; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 2rem; }
+        .register-container { background: rgba(255,255,255,0.1); padding: 3rem; border-radius: 20px; width: 100%; max-width: 500px; backdrop-filter: blur(10px); }
+        .logo { text-align: center; font-size: 3rem; margin-bottom: 1rem; }
+        h1 { text-align: center; margin-bottom: 2rem; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .form-group { margin-bottom: 1.5rem; }
+        label { display: block; margin-bottom: 0.5rem; font-weight: 500; }
+        input, select { width: 100%; padding: 1rem; border: 1px solid rgba(255,255,255,0.2); border-radius: 10px; background: rgba(255,255,255,0.1); color: #fff; font-size: 1rem; }
+        select option { background: #1a1a2e; }
+        .btn { width: 100%; padding: 1rem; border: none; border-radius: 10px; background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; font-size: 1rem; font-weight: 600; cursor: pointer; }
+        .error { background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; padding: 1rem; border-radius: 10px; margin-bottom: 1rem; }
+        .success { background: rgba(34, 197, 94, 0.2); border: 1px solid #22c55e; padding: 1rem; border-radius: 10px; margin-bottom: 1rem; }
+        .links { text-align: center; margin-top: 1.5rem; }
+        .links a { color: #667eea; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="register-container">
+        <div class="logo">💰</div>
+        <h1>Konto erstellen</h1>
+        {message}
+        <form method="POST">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Vorname</label>
+                    <input type="text" name="firstname" placeholder="Max" required>
+                </div>
+                <div class="form-group">
+                    <label>Nachname</label>
+                    <input type="text" name="lastname" placeholder="Mustermann" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Benutzername</label>
+                <input type="text" name="username" placeholder="maxmustermann" required>
+            </div>
+            <div class="form-group">
+                <label>E-Mail</label>
+                <input type="email" name="email" placeholder="max@example.com" required>
+            </div>
+            <div class="form-group">
+                <label>Passwort</label>
+                <input type="password" name="password" placeholder="Mindestens 8 Zeichen" required minlength="8">
+            </div>
+            <div class="form-group">
+                <label>Plan auswählen</label>
+                <select name="plan">
+                    <option value="free">Free - €0/Monat</option>
+                    <option value="starter">Starter - €29/Monat</option>
+                    <option value="professional">Professional - €99/Monat</option>
+                    <option value="enterprise">Enterprise - €299/Monat</option>
+                </select>
+            </div>
+            <button type="submit" class="btn">🚀 Konto erstellen</button>
+        </form>
+        <div class="links">
+            <a href="/login">Bereits ein Konto? Einloggen</a>
+        </div>
+    </div>
+</body>
+</html>'''
 
-DASHBOARD_HTML = '''<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Dashboard - West Money OS</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui;background:#0f172a;color:#fff;min-height:100vh}.sidebar{position:fixed;left:0;top:0;width:250px;height:100vh;background:#1e293b;padding:2rem 1rem}.logo{font-size:1.5rem;font-weight:bold;margin-bottom:2rem;text-align:center}.nav-item{display:block;padding:1rem;border-radius:10px;color:#fff;text-decoration:none;margin-bottom:.5rem}.nav-item:hover{background:rgba(102,126,234,.2)}.main{margin-left:250px;padding:2rem}.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1.5rem;margin-bottom:2rem}.stat-card{background:linear-gradient(135deg,rgba(102,126,234,.2),rgba(118,75,162,.2));padding:1.5rem;border-radius:15px}.stat-value{font-size:2rem;font-weight:bold}.stat-label{opacity:.7}</style></head><body><div class="sidebar"><div class="logo">💰 West Money</div><a href="/dashboard" class="nav-item">📊 Dashboard</a><a href="#contacts" class="nav-item">👥 Kontakte</a><a href="#leads" class="nav-item">🎯 Leads</a><a href="#campaigns" class="nav-item">📧 Kampagnen</a><a href="#invoices" class="nav-item">📄 Rechnungen</a><a href="#whatsapp" class="nav-item">📱 WhatsApp</a><a href="/logout" class="nav-item">🚪 Logout</a></div><div class="main"><h1 style="margin-bottom:2rem">Dashboard</h1><div class="stats"><div class="stat-card"><div class="stat-value" id="contacts">-</div><div class="stat-label">Kontakte</div></div><div class="stat-card"><div class="stat-value" id="leads">-</div><div class="stat-label">Leads</div></div><div class="stat-card"><div class="stat-value" id="value">-</div><div class="stat-label">Pipeline</div></div><div class="stat-card"><div class="stat-value" id="tasks">-</div><div class="stat-label">Tasks</div></div></div></div><script>fetch('/api/dashboard/stats').then(r=>r.json()).then(d=>{if(d.success){document.getElementById('contacts').textContent=d.stats.contacts.total;document.getElementById('leads').textContent=d.stats.leads.total;document.getElementById('value').textContent='€'+d.stats.leads.total_value.toLocaleString();document.getElementById('tasks').textContent=d.stats.tasks.pending}})</script></body></html>'''
+DASHBOARD_HTML = '''<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - West Money OS</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: #0f0f1a; color: #fff; min-height: 100vh; }
+        .sidebar { position: fixed; left: 0; top: 0; width: 260px; height: 100vh; background: linear-gradient(180deg, #1a1a2e, #16213e); padding: 1.5rem; overflow-y: auto; }
+        .logo { font-size: 1.25rem; font-weight: 700; margin-bottom: 2rem; display: flex; align-items: center; gap: 0.5rem; }
+        .nav-section { margin-bottom: 1.5rem; }
+        .nav-section-title { font-size: 0.75rem; text-transform: uppercase; opacity: 0.5; margin-bottom: 0.75rem; letter-spacing: 1px; }
+        .nav-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; border-radius: 10px; color: #fff; text-decoration: none; margin-bottom: 0.25rem; transition: 0.2s; }
+        .nav-item:hover, .nav-item.active { background: rgba(102,126,234,0.2); }
+        .nav-item-icon { width: 20px; text-align: center; }
+        .main { margin-left: 260px; padding: 2rem; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+        .header h1 { font-size: 1.75rem; }
+        .user-info { display: flex; align-items: center; gap: 1rem; }
+        .user-tokens { display: flex; gap: 0.5rem; }
+        .token { padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
+        .token-god { background: linear-gradient(135deg, #ffd700, #ff8c00); color: #000; }
+        .token-dedsec { background: linear-gradient(135deg, #ef4444, #dc2626); }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+        .stat-card { background: linear-gradient(135deg, rgba(102,126,234,0.2), rgba(118,75,162,0.2)); padding: 1.5rem; border-radius: 15px; }
+        .stat-value { font-size: 2rem; font-weight: 700; margin-bottom: 0.25rem; }
+        .stat-label { opacity: 0.7; font-size: 0.9rem; }
+        .stat-change { font-size: 0.8rem; color: #22c55e; margin-top: 0.5rem; }
+        .modules-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; }
+        .module-card { background: rgba(255,255,255,0.05); border-radius: 15px; padding: 1.5rem; cursor: pointer; transition: 0.3s; border: 1px solid transparent; }
+        .module-card:hover { background: rgba(255,255,255,0.1); border-color: #667eea; transform: translateY(-3px); }
+        .module-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; }
+        .module-icon { font-size: 2rem; }
+        .module-title { font-weight: 600; }
+        .module-status { font-size: 0.75rem; padding: 0.25rem 0.5rem; border-radius: 10px; background: rgba(34,197,94,0.2); color: #22c55e; }
+        .module-desc { opacity: 0.7; font-size: 0.9rem; line-height: 1.5; }
+        .quick-actions { display: flex; gap: 1rem; margin-top: 2rem; flex-wrap: wrap; }
+        .quick-action { padding: 0.75rem 1.5rem; background: linear-gradient(135deg, #667eea, #764ba2); border: none; border-radius: 10px; color: #fff; font-weight: 600; cursor: pointer; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <nav class="sidebar">
+        <div class="logo">💰 West Money OS</div>
+        
+        <div class="nav-section">
+            <div class="nav-section-title">Hauptmenü</div>
+            <a href="/dashboard" class="nav-item active"><span class="nav-item-icon">📊</span> Dashboard</a>
+            <a href="/dashboard/contacts" class="nav-item"><span class="nav-item-icon">👥</span> Kontakte</a>
+            <a href="/dashboard/leads" class="nav-item"><span class="nav-item-icon">🎯</span> Leads</a>
+            <a href="/dashboard/campaigns" class="nav-item"><span class="nav-item-icon">📧</span> Kampagnen</a>
+            <a href="/dashboard/invoices" class="nav-item"><span class="nav-item-icon">📄</span> Rechnungen</a>
+        </div>
+        
+        <div class="nav-section">
+            <div class="nav-section-title">Kommunikation</div>
+            <a href="/dashboard/whatsapp" class="nav-item"><span class="nav-item-icon">📱</span> WhatsApp</a>
+            <a href="/dashboard/messages" class="nav-item"><span class="nav-item-icon">💬</span> Nachrichten</a>
+            <a href="/dashboard/ai" class="nav-item"><span class="nav-item-icon">🤖</span> AI Chat</a>
+        </div>
+        
+        <div class="nav-section">
+            <div class="nav-section-title">Power Modules</div>
+            <a href="/dashboard/broly" class="nav-item"><span class="nav-item-icon">💪</span> Broly Taskforce</a>
+            <a href="/dashboard/einstein" class="nav-item"><span class="nav-item-icon">🧠</span> Einstein Agency</a>
+            <a href="/dashboard/dedsec" class="nav-item"><span class="nav-item-icon">🔐</span> DedSec Security</a>
+            <a href="/dashboard/tokens" class="nav-item"><span class="nav-item-icon">🪙</span> Token Economy</a>
+        </div>
+        
+        <div class="nav-section">
+            <div class="nav-section-title">Smart Home</div>
+            <a href="/dashboard/loxone" class="nav-item"><span class="nav-item-icon">🏠</span> LOXONE</a>
+            <a href="/dashboard/automations" class="nav-item"><span class="nav-item-icon">⚡</span> Z Automations</a>
+        </div>
+        
+        <div class="nav-section">
+            <div class="nav-section-title">System</div>
+            <a href="/dashboard/settings" class="nav-item"><span class="nav-item-icon">⚙️</span> Einstellungen</a>
+            <a href="/wiki" class="nav-item"><span class="nav-item-icon">📚</span> Wiki</a>
+            <a href="/logout" class="nav-item"><span class="nav-item-icon">🚪</span> Logout</a>
+        </div>
+    </nav>
+    
+    <main class="main">
+        <div class="header">
+            <h1>Dashboard</h1>
+            <div class="user-info">
+                <div class="user-tokens">
+                    <span class="token token-god">🪙 {tokens_god} GOD</span>
+                    <span class="token token-dedsec">🔐 {tokens_dedsec} DEDSEC</span>
+                </div>
+                <span>Willkommen, {username}!</span>
+            </div>
+        </div>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value" id="stat-contacts">-</div>
+                <div class="stat-label">Kontakte</div>
+                <div class="stat-change">↑ Diesen Monat</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-leads">-</div>
+                <div class="stat-label">Aktive Leads</div>
+                <div class="stat-change">↑ Pipeline</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-value">-</div>
+                <div class="stat-label">Pipeline Wert</div>
+                <div class="stat-change">↑ Potenzial</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-tasks">-</div>
+                <div class="stat-label">Offene Tasks</div>
+                <div class="stat-change">Heute fällig</div>
+            </div>
+        </div>
+        
+        <h2 style="margin-bottom:1rem">🚀 Power Module</h2>
+        <div class="modules-grid">
+            <div class="module-card" onclick="location.href='/dashboard/broly'">
+                <div class="module-header">
+                    <span class="module-icon">💪</span>
+                    <div>
+                        <div class="module-title">Broly Taskforce</div>
+                        <span class="module-status">LEGENDARY</span>
+                    </div>
+                </div>
+                <p class="module-desc">Legendäre Automatisierung mit Majin Shield, Ultra Instinct AI und GOD MODE Controller.</p>
+            </div>
+            
+            <div class="module-card" onclick="location.href='/dashboard/einstein'">
+                <div class="module-header">
+                    <span class="module-icon">🧠</span>
+                    <div>
+                        <div class="module-title">Einstein Agency</div>
+                        <span class="module-status">GENIUS</span>
+                    </div>
+                </div>
+                <p class="module-desc">8 Genius AI Bots für Architektur, Smart Home und intelligente Planung.</p>
+            </div>
+            
+            <div class="module-card" onclick="location.href='/dashboard/dedsec'">
+                <div class="module-header">
+                    <span class="module-icon">🔐</span>
+                    <div>
+                        <div class="module-title">DedSec Security</div>
+                        <span class="module-status">SECURE</span>
+                    </div>
+                </div>
+                <p class="module-desc">Enterprise Security mit AR/VR, 24/7 Monitoring und Security Tower System.</p>
+            </div>
+            
+            <div class="module-card" onclick="location.href='/dashboard/tokens'">
+                <div class="module-header">
+                    <span class="module-icon">🪙</span>
+                    <div>
+                        <div class="module-title">Token Economy</div>
+                        <span class="module-status">ACTIVE</span>
+                    </div>
+                </div>
+                <p class="module-desc">5 Token-Typen: GOD, DedSec, OG, Tower, Ultra für Rewards und Premium Features.</p>
+            </div>
+            
+            <div class="module-card" onclick="location.href='/dashboard/whatsapp'">
+                <div class="module-header">
+                    <span class="module-icon">📱</span>
+                    <div>
+                        <div class="module-title">WhatsApp Business</div>
+                        <span class="module-status">CONNECTED</span>
+                    </div>
+                </div>
+                <p class="module-desc">Vollständige WhatsApp Business API mit Consent Management und Templates.</p>
+            </div>
+            
+            <div class="module-card" onclick="location.href='/dashboard/loxone'">
+                <div class="module-header">
+                    <span class="module-icon">🏠</span>
+                    <div>
+                        <div class="module-title">LOXONE Smart Home</div>
+                        <span class="module-status">GOLD PARTNER</span>
+                    </div>
+                </div>
+                <p class="module-desc">LOXONE Gold Partner Integration für vollständige Gebäudeautomation.</p>
+            </div>
+        </div>
+        
+        <div class="quick-actions">
+            <a href="/dashboard/contacts?action=new" class="quick-action">+ Neuer Kontakt</a>
+            <a href="/dashboard/leads?action=new" class="quick-action">+ Neuer Lead</a>
+            <a href="/dashboard/campaigns?action=new" class="quick-action">+ Neue Kampagne</a>
+            <a href="/dashboard/ai" class="quick-action">🤖 AI Chat öffnen</a>
+        </div>
+    </main>
+    
+    <script>
+        fetch('/api/dashboard/stats')
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('stat-contacts').textContent = data.stats.contacts.total;
+                    document.getElementById('stat-leads').textContent = data.stats.leads.total;
+                    document.getElementById('stat-value').textContent = '€' + data.stats.leads.total_value.toLocaleString();
+                    document.getElementById('stat-tasks').textContent = data.stats.tasks.pending;
+                }
+            });
+    </script>
+</body>
+</html>'''
 
-PRICING_HTML = '''<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Preise - West Money OS</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui;background:linear-gradient(135deg,#0f172a,#1e1b4b);color:#fff;min-height:100vh;padding:2rem}h1{text-align:center;font-size:2.5rem;margin-bottom:3rem}.plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:2rem;max-width:1200px;margin:0 auto}.plan{background:rgba(255,255,255,.1);border-radius:20px;padding:2rem;text-align:center}.plan.featured{border:2px solid #667eea}.plan-name{font-size:1.5rem;margin-bottom:1rem}.plan-price{font-size:3rem;font-weight:bold}.plan-features{list-style:none;margin:2rem 0;text-align:left}.plan-features li{padding:.5rem 0;border-bottom:1px solid rgba(255,255,255,.1)}.btn{display:inline-block;padding:1rem 2rem;border:none;border-radius:50px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;font-weight:bold;text-decoration:none}</style></head><body><h1>💰 Preise</h1><div class="plans"><div class="plan"><div class="plan-name">Free</div><div class="plan-price">€0</div><ul class="plan-features"><li>✓ 100 Kontakte</li><li>✓ Basic CRM</li></ul><a href="/register" class="btn">Start</a></div><div class="plan"><div class="plan-name">Starter</div><div class="plan-price">€29</div><ul class="plan-features"><li>✓ 1.000 Kontakte</li><li>✓ WhatsApp</li></ul><a href="/checkout" class="btn">Starten</a></div><div class="plan featured"><div class="plan-name">Professional</div><div class="plan-price">€99</div><ul class="plan-features"><li>✓ 10.000 Kontakte</li><li>✓ AI Chatbot</li><li>✓ Banking</li></ul><a href="/checkout" class="btn">Beliebt</a></div><div class="plan"><div class="plan-name">Enterprise</div><div class="plan-price">€299</div><ul class="plan-features"><li>✓ Unbegrenzt</li><li>✓ White Label</li></ul><a href="/contact" class="btn">Kontakt</a></div></div></body></html>'''
+WIKI_HTML = '''<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wiki - West Money OS</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: #0f0f1a; color: #fff; min-height: 100vh; }
+        .wiki-sidebar { position: fixed; left: 0; top: 0; width: 280px; height: 100vh; background: #1a1a2e; padding: 2rem; overflow-y: auto; }
+        .wiki-logo { font-size: 1.25rem; font-weight: 700; margin-bottom: 2rem; }
+        .wiki-nav a { display: block; padding: 0.75rem; color: #fff; text-decoration: none; border-radius: 8px; margin-bottom: 0.25rem; }
+        .wiki-nav a:hover { background: rgba(102,126,234,0.2); }
+        .wiki-main { margin-left: 280px; padding: 3rem; max-width: 900px; }
+        h1 { font-size: 2.5rem; margin-bottom: 1rem; }
+        h2 { font-size: 1.5rem; margin: 2rem 0 1rem; color: #667eea; }
+        h3 { font-size: 1.25rem; margin: 1.5rem 0 0.75rem; }
+        p { line-height: 1.8; opacity: 0.9; margin-bottom: 1rem; }
+        code { background: rgba(102,126,234,0.2); padding: 0.25rem 0.5rem; border-radius: 5px; font-family: monospace; }
+        pre { background: #1a1a2e; padding: 1.5rem; border-radius: 10px; overflow-x: auto; margin: 1rem 0; }
+        .card { background: rgba(255,255,255,0.05); padding: 1.5rem; border-radius: 15px; margin: 1rem 0; }
+        .badge { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.8rem; font-weight: 600; margin-right: 0.5rem; }
+        .badge-gold { background: linear-gradient(135deg, #ffd700, #ff8c00); color: #000; }
+        .badge-purple { background: linear-gradient(135deg, #667eea, #764ba2); }
+        table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        th { background: rgba(102,126,234,0.2); }
+    </style>
+</head>
+<body>
+    <nav class="wiki-sidebar">
+        <div class="wiki-logo">📚 Wiki</div>
+        <div class="wiki-nav">
+            <a href="#getting-started">🚀 Getting Started</a>
+            <a href="#modules">📦 Module</a>
+            <a href="#api">🔌 API Dokumentation</a>
+            <a href="#broly">💪 Broly Taskforce</a>
+            <a href="#einstein">🧠 Einstein Agency</a>
+            <a href="#dedsec">🔐 DedSec Security</a>
+            <a href="#tokens">🪙 Token System</a>
+            <a href="#integrations">🔗 Integrationen</a>
+            <a href="#faq">❓ FAQ</a>
+            <a href="/dashboard">← Zurück zum Dashboard</a>
+        </div>
+    </nav>
+    
+    <main class="wiki-main">
+        <h1>📚 West Money OS Wiki</h1>
+        <p>Willkommen zur offiziellen Dokumentation von West Money OS v10.0 GODMODE Ultimate.</p>
+        
+        <section id="getting-started">
+            <h2>🚀 Getting Started</h2>
+            <p>West Money OS ist die ultimative All-in-One Business Platform für Unternehmen.</p>
+            
+            <div class="card">
+                <h3>Schnellstart</h3>
+                <ol style="margin-left:1.5rem;line-height:2">
+                    <li>Erstelle ein Konto unter <a href="/register" style="color:#667eea">/register</a></li>
+                    <li>Wähle deinen Plan (Free, Starter, Professional, Enterprise)</li>
+                    <li>Konfiguriere deine Integrationen (WhatsApp, HubSpot, etc.)</li>
+                    <li>Starte mit dem Import deiner Kontakte</li>
+                </ol>
+            </div>
+        </section>
+        
+        <section id="modules">
+            <h2>📦 Module</h2>
+            <table>
+                <tr><th>Modul</th><th>Beschreibung</th><th>Status</th></tr>
+                <tr><td>💼 CRM</td><td>Kontakte, Leads, Kampagnen</td><td><span class="badge badge-purple">Active</span></td></tr>
+                <tr><td>📱 WhatsApp</td><td>Business API Integration</td><td><span class="badge badge-purple">Active</span></td></tr>
+                <tr><td>💪 Broly</td><td>Automation Taskforce</td><td><span class="badge badge-gold">Legendary</span></td></tr>
+                <tr><td>🧠 Einstein</td><td>AI Bot Agency</td><td><span class="badge badge-gold">Genius</span></td></tr>
+                <tr><td>🔐 DedSec</td><td>Security System</td><td><span class="badge badge-purple">Secure</span></td></tr>
+                <tr><td>🪙 Tokens</td><td>Reward Economy</td><td><span class="badge badge-purple">Active</span></td></tr>
+            </table>
+        </section>
+        
+        <section id="api">
+            <h2>🔌 API Dokumentation</h2>
+            <p>Base URL: <code>https://west-money.com/api</code></p>
+            
+            <h3>Authentifizierung</h3>
+            <pre>POST /api/auth/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "your-password"
+}</pre>
+            
+            <h3>Endpunkte</h3>
+            <table>
+                <tr><th>Methode</th><th>Endpunkt</th><th>Beschreibung</th></tr>
+                <tr><td>GET</td><td>/api/contacts</td><td>Alle Kontakte abrufen</td></tr>
+                <tr><td>POST</td><td>/api/contacts</td><td>Neuen Kontakt erstellen</td></tr>
+                <tr><td>GET</td><td>/api/leads</td><td>Alle Leads abrufen</td></tr>
+                <tr><td>POST</td><td>/api/leads</td><td>Neuen Lead erstellen</td></tr>
+                <tr><td>GET</td><td>/api/dashboard/stats</td><td>Dashboard Statistiken</td></tr>
+                <tr><td>POST</td><td>/api/whatsapp/send</td><td>WhatsApp Nachricht senden</td></tr>
+                <tr><td>POST</td><td>/api/ai/chat</td><td>AI Chat Anfrage</td></tr>
+            </table>
+        </section>
+        
+        <section id="broly">
+            <h2>💪 Broly Taskforce</h2>
+            <p>Die legendäre Automatisierungs-Engine mit unbegrenzter Power.</p>
+            
+            <div class="card">
+                <h3>Module</h3>
+                <ul style="margin-left:1.5rem;line-height:2">
+                    <li><strong>Broly Automation Core</strong> - Unbegrenzte Workflow-Kapazität</li>
+                    <li><strong>Majin Security Shield</strong> - AES-256-GCM Verschlüsselung</li>
+                    <li><strong>DEDSEC Detection</strong> - 24/7 Anomaly Monitoring</li>
+                    <li><strong>Ultra Instinct AI</strong> - 99.4% Prediction Accuracy</li>
+                    <li><strong>GOD MODE Controller</strong> - Full System Access</li>
+                </ul>
+            </div>
+        </section>
+        
+        <section id="einstein">
+            <h2>🧠 Einstein Agency</h2>
+            <p>8 Genius AI Bots für intelligente Automatisierung.</p>
+            
+            <table>
+                <tr><th>Bot</th><th>Spezialisierung</th></tr>
+                <tr><td>🧠 Einstein</td><td>Architektur & Planung</td></tr>
+                <tr><td>🍎 Newton</td><td>Physik & Statik</td></tr>
+                <tr><td>⚡ Tesla</td><td>Elektrik & Smart Home</td></tr>
+                <tr><td>☢️ Curie</td><td>Chemie & Materialien</td></tr>
+                <tr><td>🌌 Hawking</td><td>Kosmische Berechnungen</td></tr>
+                <tr><td>💻 Turing</td><td>KI & Algorithmen</td></tr>
+                <tr><td>🎨 Da Vinci</td><td>Design & Kreativ</td></tr>
+                <tr><td>🦎 Darwin</td><td>Evolution & Optimierung</td></tr>
+            </table>
+        </section>
+        
+        <section id="tokens">
+            <h2>🪙 Token System</h2>
+            <table>
+                <tr><th>Token</th><th>Typ</th><th>Wert</th><th>Verwendung</th></tr>
+                <tr><td>🟡 GOD</td><td>Premium</td><td>1000</td><td>Premium Features freischalten</td></tr>
+                <tr><td>🔴 DEDSEC</td><td>Security</td><td>500</td><td>Security Upgrades</td></tr>
+                <tr><td>🟣 OG</td><td>Legacy</td><td>250</td><td>Early Adopter Rewards</td></tr>
+                <tr><td>🔵 TOWER</td><td>Achievement</td><td>100</td><td>Achievements & Badges</td></tr>
+                <tr><td>🟢 ULTRA</td><td>Performance</td><td>50</td><td>Performance Boosts</td></tr>
+            </table>
+        </section>
+        
+        <section id="faq">
+            <h2>❓ FAQ</h2>
+            
+            <div class="card">
+                <h3>Wie starte ich mit West Money OS?</h3>
+                <p>Registriere dich kostenlos, wähle einen Plan und konfiguriere deine ersten Integrationen. Unser Onboarding-Wizard führt dich durch alle Schritte.</p>
+            </div>
+            
+            <div class="card">
+                <h3>Welche Integrationen werden unterstützt?</h3>
+                <p>WhatsApp Business API, HubSpot CRM, Stripe, Mollie, Revolut, LOXONE, Zadarma VoIP, Slack, und viele mehr.</p>
+            </div>
+            
+            <div class="card">
+                <h3>Wie erhalte ich GOD Tokens?</h3>
+                <p>Tokens werden durch Aktivitäten vergeben: Kontakte importieren, Leads konvertieren, Kampagnen versenden, und mehr.</p>
+            </div>
+        </section>
+    </main>
+</body>
+</html>'''
 
 # =============================================================================
 # PAGE ROUTES
 # =============================================================================
 @app.route('/')
 def landing():
-    return Response(LANDING_PAGE_HTML if TEMPLATES_LOADED else LANDING_HTML, mimetype='text/html')
+    return Response(LANDING_HTML, mimetype='text/html')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -282,23 +958,50 @@ def login():
             log_security_event('login', 'info', {'user_id': user.id})
             return redirect('/dashboard')
         log_security_event('failed_login', 'warning', {'username': username})
-        html = (LOGIN_PAGE_HTML if TEMPLATES_LOADED else LOGIN_HTML).replace('{error}', '<div class="error">❌ Ungültige Anmeldedaten</div>')
-        return Response(html, mimetype='text/html')
-    html = (LOGIN_PAGE_HTML if TEMPLATES_LOADED else LOGIN_HTML).replace('{error}', '')
-    return Response(html, mimetype='text/html')
+        return Response(LOGIN_HTML.replace('{error}', '<div class="error">❌ Ungültige Anmeldedaten</div>'), mimetype='text/html')
+    return Response(LOGIN_HTML.replace('{error}', ''), mimetype='text/html')
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        email = request.form.get('email', '').strip()
+        password = request.form.get('password', '')
+        firstname = request.form.get('firstname', '')
+        lastname = request.form.get('lastname', '')
+        plan = request.form.get('plan', 'free')
+        
+        if User.query.filter_by(username=username).first():
+            return Response(REGISTER_HTML.replace('{message}', '<div class="error">❌ Benutzername bereits vergeben</div>'), mimetype='text/html')
+        if User.query.filter_by(email=email).first():
+            return Response(REGISTER_HTML.replace('{message}', '<div class="error">❌ E-Mail bereits registriert</div>'), mimetype='text/html')
+        
+        user = User(username=username, email=email, name=f"{firstname} {lastname}", plan=plan, tokens_god=100)
+        user.set_password(password)
+        db.session.add(user)
+        db.session.commit()
+        
+        log_security_event('registration', 'info', {'user_id': user.id})
+        return Response(REGISTER_HTML.replace('{message}', '<div class="success">✅ Konto erstellt! <a href="/login">Jetzt einloggen</a></div>'), mimetype='text/html')
+    return Response(REGISTER_HTML.replace('{message}', ''), mimetype='text/html')
 
 @app.route('/dashboard')
 def dashboard():
     if 'user_id' not in session:
         return redirect('/login')
     user = get_current_user()
-    if TEMPLATES_LOADED:
-        return Response(get_dashboard_html(user), mimetype='text/html')
-    return Response(DASHBOARD_HTML.replace('{username}', user.name or user.username if user else 'User'), mimetype='text/html')
+    html = DASHBOARD_HTML.replace('{username}', user.name or user.username)
+    html = html.replace('{tokens_god}', str(user.tokens_god))
+    html = html.replace('{tokens_dedsec}', str(user.tokens_dedsec))
+    return Response(html, mimetype='text/html')
 
 @app.route('/pricing')
 def pricing():
-    return Response(PRICING_PAGE_HTML if TEMPLATES_LOADED else PRICING_HTML, mimetype='text/html')
+    return redirect('/#pricing')
+
+@app.route('/wiki')
+def wiki():
+    return Response(WIKI_HTML, mimetype='text/html')
 
 @app.route('/logout')
 def logout():
@@ -306,398 +1009,70 @@ def logout():
     return redirect('/login')
 
 # =============================================================================
-# DASHBOARD API
+# API ROUTES
 # =============================================================================
-@app.route('/api/dashboard/stats', methods=['GET'])
+@app.route('/api/dashboard/stats')
 @login_required
-def get_dashboard_stats():
-    today = datetime.utcnow().date()
-    month_start = today.replace(day=1)
+def api_dashboard_stats():
     stats = {
-        'contacts': {
-            'total': Contact.query.count(),
-            'this_month': Contact.query.filter(Contact.created_at >= datetime.combine(month_start, datetime.min.time())).count(),
-            'with_consent': Contact.query.filter_by(whatsapp_consent=True).count()
-        },
-        'leads': {
-            'total': Lead.query.count(),
-            'new': Lead.query.filter_by(status='new').count(),
-            'qualified': Lead.query.filter_by(status='qualified').count(),
-            'won': Lead.query.filter_by(status='won').count(),
-            'total_value': float(db.session.query(db.func.sum(Lead.value)).scalar() or 0)
-        },
-        'tasks': {
-            'pending': Task.query.filter_by(status='pending').count(),
-            'overdue': Task.query.filter(Task.status == 'pending', Task.due_date < datetime.utcnow()).count()
-        },
-        'messages': {
-            'total': Message.query.count(),
-            'today': Message.query.filter(Message.timestamp >= datetime.combine(today, datetime.min.time())).count()
-        }
+        'contacts': {'total': Contact.query.count(), 'with_consent': Contact.query.filter_by(whatsapp_consent=True).count()},
+        'leads': {'total': Lead.query.count(), 'total_value': float(db.session.query(db.func.sum(Lead.value)).scalar() or 0)},
+        'tasks': {'pending': Task.query.filter_by(status='pending').count()},
+        'campaigns': {'total': Campaign.query.count()}
     }
     return jsonify({'success': True, 'stats': stats})
 
-@app.route('/api/dashboard/pipeline', methods=['GET'])
-@login_required
-def get_pipeline():
-    pipeline = {}
-    for status in ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'won', 'lost']:
-        leads = Lead.query.filter_by(status=status).all()
-        pipeline[status] = {'count': len(leads), 'value': sum(l.value or 0 for l in leads), 'leads': [l.to_dict() for l in leads[:5]]}
-    return jsonify({'success': True, 'pipeline': pipeline})
-
-# =============================================================================
-# CONTACTS API
-# =============================================================================
 @app.route('/api/contacts', methods=['GET'])
 @login_required
-def get_contacts():
-    page = request.args.get('page', 1, type=int)
-    search = request.args.get('search', '')
-    query = Contact.query
-    if search:
-        query = query.filter((Contact.name.ilike(f'%{search}%')) | (Contact.email.ilike(f'%{search}%')))
-    contacts = query.order_by(Contact.created_at.desc()).paginate(page=page, per_page=50, error_out=False)
-    return jsonify({'success': True, 'contacts': [c.to_dict() for c in contacts.items], 'total': contacts.total})
+def api_get_contacts():
+    contacts = Contact.query.order_by(Contact.created_at.desc()).limit(100).all()
+    return jsonify({'success': True, 'contacts': [c.to_dict() for c in contacts]})
 
 @app.route('/api/contacts', methods=['POST'])
 @login_required
-def create_contact():
+def api_create_contact():
     data = request.get_json()
-    contact = Contact(name=data.get('name'), email=data.get('email'), phone=data.get('phone'), company=data.get('company'), whatsapp_consent=data.get('whatsapp_consent', False), tags=json.dumps(data.get('tags', [])), notes=data.get('notes'), source=data.get('source'), user_id=session.get('user_id'))
+    contact = Contact(name=data.get('name'), email=data.get('email'), phone=data.get('phone'), 
+                     company=data.get('company'), user_id=session.get('user_id'))
     db.session.add(contact)
     db.session.commit()
-    return jsonify({'success': True, 'contact': contact.to_dict()}), 201
-
-@app.route('/api/contacts/<int:id>', methods=['GET'])
-@login_required
-def get_contact(id):
-    contact = Contact.query.get_or_404(id)
     return jsonify({'success': True, 'contact': contact.to_dict()})
 
-@app.route('/api/contacts/<int:id>', methods=['PUT'])
-@login_required
-def update_contact(id):
-    contact = Contact.query.get_or_404(id)
-    data = request.get_json()
-    for field in ['name', 'email', 'phone', 'company', 'whatsapp_consent', 'notes', 'source']:
-        if field in data:
-            setattr(contact, field, data[field])
-    if 'tags' in data:
-        contact.tags = json.dumps(data['tags'])
-    db.session.commit()
-    return jsonify({'success': True, 'contact': contact.to_dict()})
-
-@app.route('/api/contacts/<int:id>', methods=['DELETE'])
-@login_required
-def delete_contact(id):
-    contact = Contact.query.get_or_404(id)
-    db.session.delete(contact)
-    db.session.commit()
-    return jsonify({'success': True})
-
-@app.route('/api/contacts/bulk-consent', methods=['POST'])
-@login_required
-def bulk_consent():
-    data = request.get_json()
-    Contact.query.filter(Contact.id.in_(data.get('contact_ids', []))).update({'whatsapp_consent': data.get('consent', False)}, synchronize_session=False)
-    db.session.commit()
-    return jsonify({'success': True})
-
-# =============================================================================
-# LEADS API
-# =============================================================================
 @app.route('/api/leads', methods=['GET'])
 @login_required
-def get_leads():
-    status = request.args.get('status', '')
-    query = Lead.query
-    if status:
-        query = query.filter_by(status=status)
-    leads = query.order_by(Lead.created_at.desc()).all()
-    return jsonify({'success': True, 'leads': [l.to_dict() for l in leads], 'total': len(leads)})
+def api_get_leads():
+    leads = Lead.query.order_by(Lead.created_at.desc()).all()
+    return jsonify({'success': True, 'leads': [l.to_dict() for l in leads]})
 
 @app.route('/api/leads', methods=['POST'])
 @login_required
-def create_lead():
+def api_create_lead():
     data = request.get_json()
-    lead = Lead(title=data.get('title'), contact_id=data.get('contact_id'), value=data.get('value', 0), status=data.get('status', 'new'), source=data.get('source'), notes=data.get('notes'), assigned_to=session.get('user_id'))
+    lead = Lead(title=data.get('title'), value=data.get('value', 0), status='new', assigned_to=session.get('user_id'))
     db.session.add(lead)
     db.session.commit()
-    return jsonify({'success': True, 'lead': lead.to_dict()}), 201
-
-@app.route('/api/leads/<int:id>', methods=['GET'])
-@login_required
-def get_lead(id):
-    lead = Lead.query.get_or_404(id)
     return jsonify({'success': True, 'lead': lead.to_dict()})
 
-@app.route('/api/leads/<int:id>', methods=['PUT'])
-@login_required
-def update_lead(id):
-    lead = Lead.query.get_or_404(id)
-    data = request.get_json()
-    for field in ['title', 'value', 'status', 'source', 'notes', 'contact_id']:
-        if field in data:
-            setattr(lead, field, data[field])
-    db.session.commit()
-    return jsonify({'success': True, 'lead': lead.to_dict()})
-
-@app.route('/api/leads/<int:id>', methods=['DELETE'])
-@login_required
-def delete_lead(id):
-    lead = Lead.query.get_or_404(id)
-    db.session.delete(lead)
-    db.session.commit()
-    return jsonify({'success': True})
-
-# =============================================================================
-# CAMPAIGNS API
-# =============================================================================
-@app.route('/api/campaigns', methods=['GET'])
-@login_required
-def get_campaigns():
-    campaigns = Campaign.query.order_by(Campaign.created_at.desc()).all()
-    return jsonify({'success': True, 'campaigns': [c.to_dict() for c in campaigns]})
-
-@app.route('/api/campaigns', methods=['POST'])
-@login_required
-def create_campaign():
-    data = request.get_json()
-    campaign = Campaign(name=data.get('name'), type=data.get('type', 'whatsapp'), template_id=data.get('template_id'), created_by=session.get('user_id'))
-    db.session.add(campaign)
-    db.session.commit()
-    return jsonify({'success': True, 'campaign': campaign.to_dict()}), 201
-
-@app.route('/api/campaigns/<int:id>/send', methods=['POST'])
-@login_required
-def send_campaign(id):
-    campaign = Campaign.query.get_or_404(id)
-    contacts = Contact.query.filter_by(whatsapp_consent=True).count()
-    campaign.status = 'sent'
-    campaign.sent_count = contacts
-    campaign.sent_at = datetime.utcnow()
-    db.session.commit()
-    return jsonify({'success': True, 'sent_count': contacts})
-
-# =============================================================================
-# TASKS API
-# =============================================================================
-@app.route('/api/tasks', methods=['GET'])
-@login_required
-def get_tasks():
-    tasks = Task.query.filter_by(assigned_to=session.get('user_id')).order_by(Task.due_date.asc()).all()
-    return jsonify({'success': True, 'tasks': [t.to_dict() for t in tasks]})
-
-@app.route('/api/tasks', methods=['POST'])
-@login_required
-def create_task():
-    data = request.get_json()
-    task = Task(title=data.get('title'), description=data.get('description'), due_date=datetime.fromisoformat(data['due_date']) if data.get('due_date') else None, priority=data.get('priority', 'medium'), assigned_to=session.get('user_id'))
-    db.session.add(task)
-    db.session.commit()
-    return jsonify({'success': True, 'task': task.to_dict()}), 201
-
-@app.route('/api/tasks/<int:id>', methods=['PUT'])
-@login_required
-def update_task(id):
-    task = Task.query.get_or_404(id)
-    data = request.get_json()
-    for field in ['title', 'description', 'priority', 'status']:
-        if field in data:
-            setattr(task, field, data[field])
-    db.session.commit()
-    return jsonify({'success': True, 'task': task.to_dict()})
-
-# =============================================================================
-# INVOICES API
-# =============================================================================
-@app.route('/api/invoices', methods=['GET'])
-@login_required
-def get_invoices():
-    invoices = Invoice.query.order_by(Invoice.created_at.desc()).all()
-    return jsonify({'success': True, 'invoices': [i.to_dict() for i in invoices]})
-
-@app.route('/api/invoices', methods=['POST'])
-@login_required
-def create_invoice():
-    data = request.get_json()
-    last = Invoice.query.order_by(Invoice.id.desc()).first()
-    num = f"INV-{datetime.utcnow().strftime('%Y%m')}-{(last.id + 1) if last else 1:04d}"
-    invoice = Invoice(invoice_number=num, contact_id=data.get('contact_id'), amount=data.get('amount', 0), tax=data.get('tax', 0), items=json.dumps(data.get('items', [])))
-    db.session.add(invoice)
-    db.session.commit()
-    return jsonify({'success': True, 'invoice': invoice.to_dict()}), 201
-
-@app.route('/api/invoices/<int:id>/send', methods=['POST'])
-@login_required
-def send_invoice(id):
-    invoice = Invoice.query.get_or_404(id)
-    invoice.status = 'sent'
-    db.session.commit()
-    return jsonify({'success': True})
-
-@app.route('/api/invoices/<int:id>/paid', methods=['POST'])
-@login_required
-def mark_paid(id):
-    invoice = Invoice.query.get_or_404(id)
-    invoice.status = 'paid'
-    invoice.paid_at = datetime.utcnow()
-    db.session.commit()
-    return jsonify({'success': True})
-
-# =============================================================================
-# MESSAGES & WHATSAPP API
-# =============================================================================
-@app.route('/api/messages', methods=['GET'])
-@login_required
-def get_messages():
-    contact_id = request.args.get('contact_id', type=int)
-    query = Message.query
-    if contact_id:
-        query = query.filter_by(contact_id=contact_id)
-    messages = query.order_by(Message.timestamp.desc()).limit(100).all()
-    return jsonify({'success': True, 'messages': [m.to_dict() for m in messages]})
-
-@app.route('/api/whatsapp/send', methods=['POST'])
-@login_required
-def send_whatsapp():
-    data = request.get_json()
-    if not config.WHATSAPP_TOKEN:
-        return jsonify({'success': False, 'error': 'WhatsApp nicht konfiguriert'}), 503
-    try:
-        import requests
-        response = requests.post(f"https://graph.facebook.com/v21.0/{config.WHATSAPP_PHONE_ID}/messages", headers={'Authorization': f'Bearer {config.WHATSAPP_TOKEN}', 'Content-Type': 'application/json'}, json={'messaging_product': 'whatsapp', 'to': data.get('to'), 'type': 'text', 'text': {'body': data.get('message')}})
-        msg = Message(contact_id=data.get('contact_id'), direction='outgoing', content=data.get('message'), status='sent')
-        db.session.add(msg)
-        db.session.commit()
-        return jsonify({'success': True, 'result': response.json()})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@app.route('/api/whatsapp/templates', methods=['GET'])
-@login_required
-def get_templates():
-    if not config.WHATSAPP_TOKEN:
-        return jsonify({'success': False, 'error': 'WhatsApp nicht konfiguriert'}), 503
-    try:
-        import requests
-        response = requests.get(f"https://graph.facebook.com/v21.0/{config.WHATSAPP_BUSINESS_ID}/message_templates", headers={'Authorization': f'Bearer {config.WHATSAPP_TOKEN}'})
-        return jsonify({'success': True, 'templates': response.json().get('data', [])})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-# =============================================================================
-# NOTIFICATIONS API
-# =============================================================================
-@app.route('/api/notifications', methods=['GET'])
-@login_required
-def get_notifications():
-    notifications = Notification.query.filter_by(user_id=session.get('user_id')).order_by(Notification.created_at.desc()).limit(50).all()
-    unread = Notification.query.filter_by(user_id=session.get('user_id'), read=False).count()
-    return jsonify({'success': True, 'notifications': [n.to_dict() for n in notifications], 'unread': unread})
-
-@app.route('/api/notifications/read', methods=['POST'])
-@login_required
-def mark_read():
-    Notification.query.filter_by(user_id=session.get('user_id')).update({'read': True}, synchronize_session=False)
-    db.session.commit()
-    return jsonify({'success': True})
-
-# =============================================================================
-# SECURITY API
-# =============================================================================
-@app.route('/api/security/events', methods=['GET'])
-@login_required
-def get_security_events():
-    events = SecurityEvent.query.order_by(SecurityEvent.timestamp.desc()).limit(100).all()
-    return jsonify({'success': True, 'events': [e.to_dict() for e in events]})
-
-@app.route('/api/security/score', methods=['GET'])
-@login_required
-def get_security_score():
-    failures = SecurityEvent.query.filter(SecurityEvent.event_type == 'failed_login', SecurityEvent.timestamp > datetime.utcnow() - timedelta(hours=24)).count()
-    score = max(0, 85 - (failures * 5))
-    return jsonify({'success': True, 'score': score, 'issues': [f'{failures} fehlgeschlagene Logins'] if failures > 3 else []})
-
-# =============================================================================
-# AI CHAT API
-# =============================================================================
-@app.route('/api/ai/chat', methods=['POST'])
-@login_required
-def ai_chat():
-    data = request.get_json()
-    if not config.ANTHROPIC_API_KEY:
-        return jsonify({'success': False, 'error': 'AI nicht konfiguriert'}), 503
-    try:
-        import anthropic
-        client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
-        response = client.messages.create(model=config.CLAUDE_MODEL, max_tokens=1024, system="Du bist ein Business-Assistent für West Money OS.", messages=[{"role": "user", "content": data.get('message', '')}])
-        return jsonify({'success': True, 'response': response.content[0].text})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-# =============================================================================
-# AUTH API
-# =============================================================================
-@app.route('/api/auth/login', methods=['POST'])
-def api_login():
-    data = request.get_json()
-    user = User.query.filter((User.username == data.get('username')) | (User.email == data.get('username'))).first()
-    if user and user.check_password(data.get('password', '')):
-        session['user_id'] = user.id
-        session.permanent = True
-        return jsonify({'success': True, 'user': user.to_dict()})
-    return jsonify({'success': False, 'error': 'Ungültige Anmeldedaten'}), 401
-
-@app.route('/api/auth/logout', methods=['POST'])
-def api_logout():
-    session.clear()
-    return jsonify({'success': True})
-
-@app.route('/api/auth/me', methods=['GET'])
-@login_required
-def api_me():
-    user = get_current_user()
-    return jsonify({'success': True, 'user': user.to_dict()})
-
-# =============================================================================
-# HEALTH CHECK
-# =============================================================================
 @app.route('/api/health')
-def health():
+def api_health():
     return jsonify({
-        'status': 'healthy',
-        'version': '9.1.0-GODMODE',
+        'status': 'healthy', 'version': '10.0.0-GODMODE-ULTIMATE',
         'timestamp': datetime.utcnow().isoformat(),
-        'services': {
-            'database': 'connected',
-            'whatsapp': 'configured' if config.WHATSAPP_TOKEN else 'not configured',
-            'stripe': 'configured' if config.STRIPE_SECRET_KEY else 'not configured',
-            'hubspot': 'configured' if config.HUBSPOT_API_KEY else 'not configured',
-            'claude_ai': 'configured' if config.ANTHROPIC_API_KEY else 'not configured',
-            'revolut': 'configured' if config.REVOLUT_API_KEY else 'not configured',
-            'mollie': 'configured' if config.MOLLIE_API_KEY else 'not configured'
+        'modules': {
+            'crm': 'active', 'whatsapp': 'configured' if config.WHATSAPP_TOKEN else 'not configured',
+            'broly': 'legendary', 'einstein': 'genius', 'dedsec': 'secure', 'tokens': 'active'
         }
     })
 
-# =============================================================================
-# ERROR HANDLERS
-# =============================================================================
+# Error handlers
 @app.errorhandler(404)
 def not_found(e):
-    if request.path.startswith('/api/'):
-        return jsonify({'success': False, 'error': 'Nicht gefunden'}), 404
     return redirect('/')
 
 @app.errorhandler(500)
 def server_error(e):
-    logger.error(f"Server error: {e}")
     return jsonify({'success': False, 'error': 'Interner Serverfehler'}), 500
 
-# =============================================================================
-# RUN
-# =============================================================================
 if __name__ == '__main__':
-    print("🚀 Starting West Money OS v9.1 GODMODE...")
+    print("🚀 West Money OS v10.0 GODMODE ULTIMATE starting...")
     app.run(host='0.0.0.0', port=5000, debug=False)
