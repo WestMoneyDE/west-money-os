@@ -1,2805 +1,2268 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
-╔═══════════════════════════════════════════════════════════════════════════════╗
-║         WEST MONEY OS v11.0 - ULTIMATE GODMODE EDITION                        ║
-║                    Enterprise Universe GmbH © 2025                            ║
-╚═══════════════════════════════════════════════════════════════════════════════╝
+WEST MONEY OS v13.0 - COMPLETE PLATFORM
+========================================
+Enterprise Universe GmbH
+CEO: Ömer Hüseyin Coşkun
+Launch: 01.01.2026
+
+Modules:
+- Dashboard & CRM
+- Einstein AI Agency
+- DedSec Security Ecosystem
+- WhatsApp Business
+- GOD BOT AI
+- Enterprise Hub
 """
 
-import os, json, secrets, logging, re, requests
-from datetime import datetime, timedelta
+from flask import Flask, render_template_string, jsonify, request, redirect, url_for, session
 from functools import wraps
-from flask import Flask, request, jsonify, session, redirect, Response
-from flask_sqlalchemy import SQLAlchemy
-from flask_cors import CORS
-from werkzeug.security import generate_password_hash, check_password_hash
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger('WestMoneyOS')
-
-class Config:
-    SECRET_KEY = os.getenv('SECRET_KEY', secrets.token_hex(32))
-    SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL', 'sqlite:///westmoney.db')
-    SQLALCHEMY_TRACK_MODIFICATIONS = False
+import json
+from datetime import datetime
+import os
 
 app = Flask(__name__)
-app.config.from_object(Config())
-app.permanent_session_lifetime = timedelta(days=30)
-CORS(app, supports_credentials=True)
-db = SQLAlchemy(app)
+app.secret_key = 'westmoney-godmode-2026-enterprise-universe'
 
-# =============================================================================
-# DATABASE MODELS
-# =============================================================================
-class User(db.Model):
-    __tablename__ = 'users'
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
-    password_hash = db.Column(db.String(256))
-    name = db.Column(db.String(120))
-    role = db.Column(db.String(20), default='user')
-    plan = db.Column(db.String(20), default='free')
-    tokens_god = db.Column(db.Integer, default=100)
-    tokens_dedsec = db.Column(db.Integer, default=50)
-    tokens_og = db.Column(db.Integer, default=25)
-    tokens_tower = db.Column(db.Integer, default=10)
-    phone = db.Column(db.String(20))
-    hubspot_id = db.Column(db.String(50))
-    avatar = db.Column(db.String(255), default='')
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    last_login = db.Column(db.DateTime)
-    
-    def set_password(self, password):
-        self.password_hash = generate_password_hash(password)
-    def check_password(self, password):
-        return check_password_hash(self.password_hash, password)
-    def to_dict(self):
-        return {'id': self.id, 'username': self.username, 'email': self.email, 'name': self.name, 'role': self.role, 'plan': self.plan,
-            'tokens': {'god': self.tokens_god, 'dedsec': self.tokens_dedsec, 'og': self.tokens_og, 'tower': self.tokens_tower}}
-
-class Contact(db.Model):
-    __tablename__ = 'contacts'
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(120), nullable=False)
-    email = db.Column(db.String(120))
-    phone = db.Column(db.String(50))
-    company = db.Column(db.String(120))
-    position = db.Column(db.String(100))
-    whatsapp_consent = db.Column(db.Boolean, default=False)
-    hubspot_id = db.Column(db.String(50))
-    tags = db.Column(db.Text, default='[]')
-    notes = db.Column(db.Text)
-    source = db.Column(db.String(50))
-    status = db.Column(db.String(20), default='active')
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    def to_dict(self):
-        return {'id': self.id, 'name': self.name, 'email': self.email, 'phone': self.phone, 'company': self.company, 
-            'position': self.position, 'whatsapp_consent': self.whatsapp_consent, 'status': self.status,
-            'tags': json.loads(self.tags) if self.tags else [], 'notes': self.notes, 'source': self.source,
-            'created_at': self.created_at.isoformat() if self.created_at else None}
-
-class Lead(db.Model):
-    __tablename__ = 'leads'
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(200), nullable=False)
-    contact_id = db.Column(db.Integer, db.ForeignKey('contacts.id'))
-    contact_name = db.Column(db.String(120))
-    company = db.Column(db.String(120))
-    value = db.Column(db.Float, default=0)
-    status = db.Column(db.String(50), default='new')
-    priority = db.Column(db.String(20), default='medium')
-    source = db.Column(db.String(50))
-    notes = db.Column(db.Text)
-    expected_close = db.Column(db.DateTime)
-    assigned_to = db.Column(db.Integer, db.ForeignKey('users.id'))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    def to_dict(self):
-        return {'id': self.id, 'title': self.title, 'contact_name': self.contact_name, 'company': self.company,
-            'value': self.value, 'status': self.status, 'priority': self.priority, 'source': self.source, 'notes': self.notes,
-            'created_at': self.created_at.isoformat() if self.created_at else None}
-
-class Campaign(db.Model):
-    __tablename__ = 'campaigns'
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(200), nullable=False)
-    type = db.Column(db.String(50), default='whatsapp')
-    status = db.Column(db.String(50), default='draft')
-    template = db.Column(db.Text)
-    target_tags = db.Column(db.Text, default='[]')
-    sent_count = db.Column(db.Integer, default=0)
-    open_count = db.Column(db.Integer, default=0)
-    click_count = db.Column(db.Integer, default=0)
-    scheduled_at = db.Column(db.DateTime)
-    sent_at = db.Column(db.DateTime)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    def to_dict(self):
-        return {'id': self.id, 'name': self.name, 'type': self.type, 'status': self.status, 'template': self.template,
-            'sent_count': self.sent_count, 'open_count': self.open_count, 'click_count': self.click_count,
-            'created_at': self.created_at.isoformat() if self.created_at else None}
-
-class Invoice(db.Model):
-    __tablename__ = 'invoices'
-    id = db.Column(db.Integer, primary_key=True)
-    invoice_number = db.Column(db.String(50), unique=True)
-    contact_id = db.Column(db.Integer, db.ForeignKey('contacts.id'))
-    contact_name = db.Column(db.String(120))
-    contact_email = db.Column(db.String(120))
-    items = db.Column(db.Text, default='[]')
-    subtotal = db.Column(db.Float, default=0)
-    tax_rate = db.Column(db.Float, default=19)
-    tax_amount = db.Column(db.Float, default=0)
-    total = db.Column(db.Float, default=0)
-    status = db.Column(db.String(50), default='draft')
-    due_date = db.Column(db.DateTime)
-    paid_at = db.Column(db.DateTime)
-    notes = db.Column(db.Text)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    def to_dict(self):
-        return {'id': self.id, 'invoice_number': self.invoice_number, 'contact_name': self.contact_name, 'contact_email': self.contact_email,
-            'items': json.loads(self.items) if self.items else [], 'subtotal': self.subtotal, 'tax_rate': self.tax_rate,
-            'tax_amount': self.tax_amount, 'total': self.total, 'status': self.status, 'notes': self.notes,
-            'due_date': self.due_date.isoformat() if self.due_date else None, 'created_at': self.created_at.isoformat() if self.created_at else None}
-
-class Message(db.Model):
-    __tablename__ = 'messages'
-    id = db.Column(db.Integer, primary_key=True)
-    contact_id = db.Column(db.Integer, db.ForeignKey('contacts.id'))
-    contact_name = db.Column(db.String(120))
-    direction = db.Column(db.String(20))
-    channel = db.Column(db.String(20), default='whatsapp')
-    content = db.Column(db.Text)
-    status = db.Column(db.String(50), default='sent')
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    def to_dict(self):
-        return {'id': self.id, 'contact_name': self.contact_name, 'direction': self.direction, 'channel': self.channel,
-            'content': self.content, 'status': self.status, 'created_at': self.created_at.isoformat() if self.created_at else None}
-
-class ChatHistory(db.Model):
-    __tablename__ = 'chat_history'
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
-    role = db.Column(db.String(20))
-    content = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    def to_dict(self):
-        return {'id': self.id, 'role': self.role, 'content': self.content, 'created_at': self.created_at.isoformat() if self.created_at else None}
-
-class Task(db.Model):
-    __tablename__ = 'tasks'
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(200), nullable=False)
-    description = db.Column(db.Text)
-    due_date = db.Column(db.DateTime)
-    priority = db.Column(db.String(20), default='medium')
-    status = db.Column(db.String(50), default='pending')
-    category = db.Column(db.String(50))
-    assigned_bot = db.Column(db.String(50))
-    assigned_to = db.Column(db.Integer, db.ForeignKey('users.id'))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    def to_dict(self):
-        return {'id': self.id, 'title': self.title, 'description': self.description, 'priority': self.priority, 
-            'status': self.status, 'category': self.category, 'assigned_bot': self.assigned_bot,
-            'due_date': self.due_date.isoformat() if self.due_date else None}
-
-class SecurityEvent(db.Model):
-    __tablename__ = 'security_events'
-    id = db.Column(db.Integer, primary_key=True)
-    event_type = db.Column(db.String(50))
-    severity = db.Column(db.String(20))
-    source = db.Column(db.String(100))
-    details = db.Column(db.Text)
-    ip_address = db.Column(db.String(50))
-    resolved = db.Column(db.Boolean, default=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    def to_dict(self):
-        return {'id': self.id, 'event_type': self.event_type, 'severity': self.severity, 'source': self.source,
-            'details': self.details, 'resolved': self.resolved, 'created_at': self.created_at.isoformat() if self.created_at else None}
-
-class TokenTransaction(db.Model):
-    __tablename__ = 'token_transactions'
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
-    token_type = db.Column(db.String(20))
-    amount = db.Column(db.Integer)
-    action = db.Column(db.String(50))
-    description = db.Column(db.String(200))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    def to_dict(self):
-        return {'id': self.id, 'token_type': self.token_type, 'amount': self.amount, 'action': self.action,
-            'description': self.description, 'created_at': self.created_at.isoformat() if self.created_at else None}
-
-class Automation(db.Model):
-    __tablename__ = 'automations'
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(200), nullable=False)
-    trigger_type = db.Column(db.String(50))
-    trigger_config = db.Column(db.Text, default='{}')
-    action_type = db.Column(db.String(50))
-    action_config = db.Column(db.Text, default='{}')
-    is_active = db.Column(db.Boolean, default=True)
-    run_count = db.Column(db.Integer, default=0)
-    last_run = db.Column(db.DateTime)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    def to_dict(self):
-        return {'id': self.id, 'name': self.name, 'trigger_type': self.trigger_type, 'action_type': self.action_type,
-            'is_active': self.is_active, 'run_count': self.run_count, 'last_run': self.last_run.isoformat() if self.last_run else None}
-
-# =============================================================================
-# HELPERS
-# =============================================================================
-def get_current_user():
-    if 'user_id' not in session:
-        return None
-    return User.query.get(session['user_id'])
-
+# ============================================================================
+# AUTHENTICATION
+# ============================================================================
 def login_required(f):
     @wraps(f)
-    def decorated(*args, **kwargs):
-        if 'user_id' not in session:
-            if request.is_json:
-                return jsonify({'success': False, 'error': 'Nicht authentifiziert'}), 401
-            return redirect('/login')
+    def decorated_function(*args, **kwargs):
+        if not session.get('logged_in'):
+            return redirect(url_for('login'))
         return f(*args, **kwargs)
-    return decorated
+    return decorated_function
 
-def get_env_var(key):
-    try:
-        with open('/var/www/westmoney/.env', 'r') as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith('#') and '=' in line:
-                    k, v = line.split('=', 1)
-                    if k == key:
-                        return v
-    except:
-        pass
-    return os.getenv(key, '')
+# ============================================================================
+# SHARED DATA
+# ============================================================================
+CERTIFICATIONS = [
+    {"name": "ISO 9001:2015", "type": "quality", "icon": "🏅", "desc": "Qualitätsmanagement"},
+    {"name": "ISO 14001:2015", "type": "environment", "icon": "🌿", "desc": "Umweltmanagement"},
+    {"name": "ISO 27001:2022", "type": "security", "icon": "🔒", "desc": "Informationssicherheit"},
+    {"name": "ISO 45001:2018", "type": "safety", "icon": "⚡", "desc": "Arbeitsschutz"},
+    {"name": "DSGVO Konform", "type": "privacy", "icon": "🛡️", "desc": "EU-Datenschutz"},
+    {"name": "TÜV Rheinland", "type": "german", "icon": "✅", "desc": "Geprüfte Sicherheit"},
+    {"name": "LOXONE Platinum", "type": "partner", "icon": "🏠", "desc": "Smart Home Partner"},
+    {"name": "KNX Certified", "type": "partner", "icon": "🔌", "desc": "Bus-System Zertifiziert"},
+]
 
-def award_tokens(user_id, token_type, amount, description):
-    user = User.query.get(user_id)
-    if user:
-        if token_type == 'god': user.tokens_god += amount
-        elif token_type == 'dedsec': user.tokens_dedsec += amount
-        elif token_type == 'og': user.tokens_og += amount
-        elif token_type == 'tower': user.tokens_tower += amount
-        tx = TokenTransaction(user_id=user_id, token_type=token_type, amount=amount, action='earn', description=description)
-        db.session.add(tx)
-        db.session.commit()
+AWARDS = [
+    {"name": "Top Smart Home Company 2024", "org": "Smart Home Awards", "icon": "🏆"},
+    {"name": "Innovation Award Rhein-Main", "org": "IHK Frankfurt", "icon": "💡"},
+    {"name": "Best PropTech Startup DACH", "org": "PropTech Summit", "icon": "🚀"},
+    {"name": "Digital Pioneer Award", "org": "Digitalverband", "icon": "⭐"},
+    {"name": "Green Building Excellence", "org": "DGNB", "icon": "🌱"},
+]
 
-def generate_invoice_number():
-    year_month = datetime.now().strftime('%Y%m')
-    count = Invoice.query.filter(Invoice.invoice_number.like(f'INV-{year_month}%')).count()
-    return f'INV-{year_month}-{count+1:04d}'
-# =============================================================================
-# SHARED STYLES (Continuation)
-# =============================================================================
-BASE_CSS = '''
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: #0a0a12; color: #fff; min-height: 100vh; }
-a { color: inherit; text-decoration: none; }
+LEADS_DATA = [
+    {"id": 1, "name": "Thomas Moser", "company": "Loxone Electronics", "position": "Gründer", "score": 96, "stage": "contacted", "value": 500000},
+    {"id": 2, "name": "Martin Öller", "company": "Loxone Electronics", "position": "Gründer", "score": 96, "stage": "contacted", "value": 500000},
+    {"id": 3, "name": "Rüdiger Keinberger", "company": "Loxone Electronics", "position": "CEO", "score": 95, "stage": "contacted", "value": 450000},
+    {"id": 4, "name": "Dr. Michael Maxelon", "company": "Mainova AG", "position": "Vorstandsvorsitzender", "score": 95, "stage": "qualified", "value": 380000},
+    {"id": 5, "name": "Max Hofmann", "company": "Hofmann Bau AG", "position": "Vorstand", "score": 94, "stage": "won", "value": 345000},
+    {"id": 6, "name": "Frank Junker", "company": "ABG Frankfurt Holding", "position": "Vors. GF", "score": 92, "stage": "proposal", "value": 420000},
+    {"id": 7, "name": "Adam Irányi", "company": "Union Investment RE", "position": "Head of Investment", "score": 92, "stage": "contacted", "value": 280000},
+    {"id": 8, "name": "Anna Müller", "company": "Smart Home Bayern", "position": "GF", "score": 91, "stage": "won", "value": 156000},
+    {"id": 9, "name": "Tino Kugler", "company": "Loxone Deutschland", "position": "MD", "score": 90, "stage": "negotiation", "value": 220000},
+    {"id": 10, "name": "Markus Fuhrmann", "company": "Gropyus", "position": "Gründer", "score": 90, "stage": "qualified", "value": 350000},
+]
 
-.sidebar { position: fixed; left: 0; top: 0; width: 260px; height: 100vh; background: linear-gradient(180deg, #12121a 0%, #1a1a2e 100%); padding: 1.5rem; overflow-y: auto; border-right: 1px solid rgba(255,255,255,0.05); z-index: 100; }
-.logo { font-size: 1.25rem; font-weight: 700; margin-bottom: 2rem; display: flex; align-items: center; gap: 0.5rem; }
-.nav-section { margin-bottom: 1.5rem; }
-.nav-title { font-size: 0.7rem; text-transform: uppercase; opacity: 0.4; margin-bottom: 0.75rem; letter-spacing: 1px; padding-left: 1rem; }
-.nav-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; border-radius: 12px; color: rgba(255,255,255,0.7); margin-bottom: 0.25rem; transition: all 0.2s; }
-.nav-item:hover { background: rgba(102,126,234,0.15); color: #fff; }
-.nav-item.active { background: linear-gradient(135deg, rgba(102,126,234,0.3), rgba(118,75,162,0.3)); color: #fff; border: 1px solid rgba(102,126,234,0.3); }
+EINSTEIN_PREDICTIONS = [
+    {"type": "lead_conversion", "prediction": "87% Wahrscheinlichkeit", "lead": "Thomas Moser", "confidence": 87},
+    {"type": "deal_close", "prediction": "Q1 2026 Abschluss", "lead": "Hofmann Bau AG", "confidence": 92},
+    {"type": "upsell", "prediction": "€150k zusätzlich möglich", "lead": "Mainova AG", "confidence": 78},
+    {"type": "churn_risk", "prediction": "Niedriges Risiko", "lead": "Smart Home Bayern", "confidence": 95},
+    {"type": "best_contact", "prediction": "Dienstag 10:00 Uhr", "lead": "Loxone Electronics", "confidence": 83},
+]
 
-.main { margin-left: 260px; min-height: 100vh; }
-.topbar { padding: 1rem 2rem; background: rgba(0,0,0,0.3); border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 50; backdrop-filter: blur(10px); }
-.topbar h1 { font-size: 1.5rem; font-weight: 600; }
-.topbar-right { display: flex; align-items: center; gap: 1rem; }
-.token-badge { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; border-radius: 20px; font-size: 0.85rem; font-weight: 600; }
-.token-badge.god { background: rgba(255,215,0,0.15); border: 1px solid rgba(255,215,0,0.3); color: #ffd700; }
-.token-badge.dedsec { background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); color: #ef4444; }
+DEDSEC_SYSTEMS = [
+    {"id": "tower-01", "name": "Command Tower Frankfurt", "status": "online", "alerts": 0, "cameras": 24},
+    {"id": "drone-01", "name": "Patrol Drone Alpha", "status": "active", "battery": 87, "location": "Sector A"},
+    {"id": "drone-02", "name": "Patrol Drone Beta", "status": "charging", "battery": 23, "location": "Base"},
+    {"id": "firewall-01", "name": "Cyber Shield Main", "status": "active", "blocked": 1247, "threats": 3},
+    {"id": "vault-01", "name": "Secure Vault Primary", "status": "locked", "files": 892, "encrypted": True},
+]
 
-.content { padding: 2rem; }
-.card { background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 1.5rem; margin-bottom: 1.5rem; }
-.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-.card-title { font-size: 1.1rem; font-weight: 600; }
-
-.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
-.stat-card { background: linear-gradient(135deg, rgba(102,126,234,0.15) 0%, rgba(118,75,162,0.15) 100%); border: 1px solid rgba(102,126,234,0.2); border-radius: 16px; padding: 1.5rem; }
-.stat-value { font-size: 2rem; font-weight: 700; margin-bottom: 0.25rem; }
-.stat-label { font-size: 0.85rem; opacity: 0.7; }
-.stat-change { font-size: 0.8rem; color: #22c55e; margin-top: 0.5rem; }
-
-.btn { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1.5rem; border: none; border-radius: 10px; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
-.btn-primary { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; }
-.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(102,126,234,0.4); }
-.btn-secondary { background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.2); }
-.btn-success { background: linear-gradient(135deg, #22c55e, #16a34a); color: #fff; }
-.btn-danger { background: linear-gradient(135deg, #ef4444, #dc2626); color: #fff; }
-.btn-sm { padding: 0.5rem 1rem; font-size: 0.8rem; }
-
-.form-group { margin-bottom: 1rem; }
-.form-label { display: block; font-size: 0.85rem; font-weight: 500; margin-bottom: 0.5rem; }
-.form-input { width: 100%; padding: 0.75rem 1rem; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; color: #fff; font-size: 0.95rem; }
-.form-input:focus { outline: none; border-color: #667eea; background: rgba(255,255,255,0.08); }
-select.form-input option { background: #1a1a2e; color: #fff; }
-textarea.form-input { resize: vertical; min-height: 100px; }
-
-table { width: 100%; border-collapse: collapse; }
-th, td { padding: 1rem; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.05); }
-th { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; opacity: 0.6; }
-tr:hover { background: rgba(255,255,255,0.02); }
-
-.badge { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
-.badge-success { background: rgba(34,197,94,0.2); color: #22c55e; }
-.badge-warning { background: rgba(245,158,11,0.2); color: #f59e0b; }
-.badge-danger { background: rgba(239,68,68,0.2); color: #ef4444; }
-.badge-info { background: rgba(59,130,246,0.2); color: #3b82f6; }
-.badge-purple { background: rgba(139,92,246,0.2); color: #8b5cf6; }
-
-.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: none; align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(5px); }
-.modal-overlay.active { display: flex; }
-.modal { background: #1a1a2e; border-radius: 20px; padding: 2rem; width: 90%; max-width: 500px; max-height: 90vh; overflow-y: auto; border: 1px solid rgba(255,255,255,0.1); }
-.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
-.modal-title { font-size: 1.25rem; font-weight: 600; }
-.modal-close { background: none; border: none; color: #fff; font-size: 1.5rem; cursor: pointer; }
-
-.empty-state { text-align: center; padding: 4rem 2rem; }
-.empty-icon { font-size: 4rem; margin-bottom: 1rem; opacity: 0.5; }
-
-.pipeline { display: flex; gap: 1rem; overflow-x: auto; padding-bottom: 1rem; }
-.pipeline-column { flex: 0 0 280px; background: rgba(255,255,255,0.03); border-radius: 12px; padding: 1rem; }
-.pipeline-header { font-size: 0.85rem; font-weight: 600; margin-bottom: 1rem; display: flex; justify-content: space-between; }
-.pipeline-count { background: rgba(255,255,255,0.1); padding: 0.25rem 0.5rem; border-radius: 10px; font-size: 0.75rem; }
-.pipeline-card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 1rem; margin-bottom: 0.75rem; cursor: pointer; }
-.pipeline-card:hover { transform: translateY(-2px); border-color: rgba(102,126,234,0.3); }
-.pipeline-card-title { font-weight: 500; margin-bottom: 0.5rem; }
-.pipeline-card-meta { font-size: 0.8rem; opacity: 0.6; }
-.pipeline-card-value { font-size: 0.9rem; color: #22c55e; font-weight: 600; margin-top: 0.5rem; }
-
-.chat-container { display: flex; flex-direction: column; height: calc(100vh - 180px); }
-.chat-messages { flex: 1; overflow-y: auto; padding: 1rem; }
-.chat-message { max-width: 80%; margin-bottom: 1rem; }
-.chat-message.user { margin-left: auto; }
-.chat-message.assistant { margin-right: auto; }
-.chat-bubble { padding: 1rem 1.25rem; border-radius: 16px; line-height: 1.5; }
-.chat-message.user .chat-bubble { background: linear-gradient(135deg, #667eea, #764ba2); }
-.chat-message.assistant .chat-bubble { background: rgba(255,255,255,0.1); }
-.chat-input-container { padding: 1rem; border-top: 1px solid rgba(255,255,255,0.1); display: flex; gap: 1rem; }
-.chat-input { flex: 1; padding: 1rem; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; color: #fff; resize: none; }
-
-.grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
-.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
-.grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; }
-
-.fade-in { animation: fadeIn 0.3s ease; }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-.pulse { animation: pulse 2s infinite; }
-@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-
-@media (max-width: 768px) { .sidebar { transform: translateX(-100%); } .main { margin-left: 0; } .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+# ============================================================================
+# BASE TEMPLATE
+# ============================================================================
+BASE_TEMPLATE = '''
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} | West Money OS</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: {{ bg_color|default('#0a0a0a') }}; 
+            color: {{ text_color|default('#ffffff') }}; 
+            min-height: 100vh;
+        }
+        
+        /* Sidebar */
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 280px;
+            height: 100vh;
+            background: linear-gradient(180deg, #1a1a2e 0%, #0f0f1a 100%);
+            border-right: 1px solid rgba(255,255,255,0.1);
+            padding: 20px;
+            overflow-y: auto;
+            z-index: 1000;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 20px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            margin-bottom: 20px;
+        }
+        
+        .logo-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, #FF5722, #FF9800);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+        
+        .logo-text {
+            font-size: 20px;
+            font-weight: 700;
+            background: linear-gradient(90deg, #FF5722, #FFD700);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .nav-section {
+            margin-bottom: 24px;
+        }
+        
+        .nav-section-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: rgba(255,255,255,0.4);
+            margin-bottom: 12px;
+            padding-left: 12px;
+        }
+        
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            border-radius: 10px;
+            color: rgba(255,255,255,0.7);
+            text-decoration: none;
+            transition: all 0.3s ease;
+            margin-bottom: 4px;
+        }
+        
+        .nav-item:hover, .nav-item.active {
+            background: rgba(255,87,34,0.15);
+            color: #FF5722;
+        }
+        
+        .nav-item.active {
+            background: linear-gradient(90deg, rgba(255,87,34,0.2), transparent);
+            border-left: 3px solid #FF5722;
+        }
+        
+        .nav-icon {
+            width: 20px;
+            text-align: center;
+        }
+        
+        /* Main Content */
+        .main-content {
+            margin-left: 280px;
+            padding: 30px;
+            min-height: 100vh;
+        }
+        
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+        
+        .page-title {
+            font-size: 28px;
+            font-weight: 700;
+        }
+        
+        .page-subtitle {
+            color: rgba(255,255,255,0.6);
+            margin-top: 4px;
+        }
+        
+        /* Cards */
+        .card {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+        
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, rgba(255,87,34,0.1), rgba(255,152,0,0.05));
+            border: 1px solid rgba(255,87,34,0.2);
+            border-radius: 16px;
+            padding: 24px;
+        }
+        
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            background: linear-gradient(90deg, #FF5722, #FFD700);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .stat-label {
+            color: rgba(255,255,255,0.6);
+            margin-top: 4px;
+        }
+        
+        .stat-change {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            border-radius: 20px;
+            font-size: 12px;
+            margin-top: 8px;
+        }
+        
+        .stat-change.positive {
+            background: rgba(76,175,80,0.2);
+            color: #4CAF50;
+        }
+        
+        .stat-change.negative {
+            background: rgba(244,67,54,0.2);
+            color: #F44336;
+        }
+        
+        /* Tables */
+        .table-container {
+            overflow-x: auto;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th, td {
+            padding: 14px 16px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        th {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: rgba(255,255,255,0.5);
+            font-weight: 500;
+        }
+        
+        tr:hover {
+            background: rgba(255,255,255,0.02);
+        }
+        
+        /* Badges */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .badge-success { background: rgba(76,175,80,0.2); color: #4CAF50; }
+        .badge-warning { background: rgba(255,152,0,0.2); color: #FF9800; }
+        .badge-danger { background: rgba(244,67,54,0.2); color: #F44336; }
+        .badge-info { background: rgba(33,150,243,0.2); color: #2196F3; }
+        .badge-purple { background: rgba(156,39,176,0.2); color: #9C27B0; }
+        
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            transition: all 0.3s ease;
+            text-decoration: none;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #FF5722, #FF9800);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(255,87,34,0.4);
+        }
+        
+        .btn-secondary {
+            background: rgba(255,255,255,0.1);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        /* Progress Bar */
+        .progress-bar {
+            height: 8px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+        
+        /* Score Badge */
+        .score-badge {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 14px;
+        }
+        
+        .score-high { background: linear-gradient(135deg, #4CAF50, #8BC34A); }
+        .score-medium { background: linear-gradient(135deg, #FF9800, #FFC107); }
+        .score-low { background: linear-gradient(135deg, #F44336, #E91E63); }
+        
+        /* Certifications Grid */
+        .cert-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+        }
+        
+        .cert-card {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        
+        .cert-card:hover {
+            transform: translateY(-4px);
+            border-color: #FF5722;
+        }
+        
+        .cert-icon {
+            font-size: 32px;
+            margin-bottom: 12px;
+        }
+        
+        .cert-name {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .cert-desc {
+            font-size: 12px;
+            color: rgba(255,255,255,0.5);
+        }
+        
+        /* DedSec Theme */
+        .dedsec-glow {
+            text-shadow: 0 0 10px #00D4FF, 0 0 20px #00D4FF;
+        }
+        
+        .dedsec-card {
+            background: linear-gradient(135deg, rgba(0,212,255,0.1), rgba(0,255,65,0.05));
+            border: 1px solid rgba(0,212,255,0.3);
+        }
+        
+        /* Einstein Theme */
+        .einstein-card {
+            background: linear-gradient(135deg, rgba(156,39,176,0.1), rgba(103,58,183,0.05));
+            border: 1px solid rgba(156,39,176,0.3);
+        }
+        
+        /* Animations */
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .pulse { animation: pulse 2s infinite; }
+        
+        @keyframes glow {
+            0%, 100% { box-shadow: 0 0 5px rgba(255,87,34,0.5); }
+            50% { box-shadow: 0 0 20px rgba(255,87,34,0.8); }
+        }
+        
+        .glow { animation: glow 2s infinite; }
+        
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .sidebar { width: 80px; padding: 10px; }
+            .logo-text, .nav-text, .nav-section-title { display: none; }
+            .main-content { margin-left: 80px; }
+            .nav-item { justify-content: center; padding: 12px; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <nav class="sidebar">
+        <div class="logo">
+            <div class="logo-icon">⚡</div>
+            <div>
+                <div class="logo-text">West Money</div>
+                <div style="font-size: 10px; color: rgba(255,255,255,0.5);">OS v13.0</div>
+            </div>
+        </div>
+        
+        <div class="nav-section">
+            <div class="nav-section-title">Main</div>
+            <a href="/dashboard" class="nav-item {{ 'active' if active_page == 'dashboard' else '' }}">
+                <span class="nav-icon">📊</span>
+                <span class="nav-text">Dashboard</span>
+            </a>
+            <a href="/dashboard/leads" class="nav-item {{ 'active' if active_page == 'leads' else '' }}">
+                <span class="nav-icon">👥</span>
+                <span class="nav-text">Leads</span>
+            </a>
+            <a href="/dashboard/projects" class="nav-item {{ 'active' if active_page == 'projects' else '' }}">
+                <span class="nav-icon">🏗️</span>
+                <span class="nav-text">Projekte</span>
+            </a>
+        </div>
+        
+        <div class="nav-section">
+            <div class="nav-section-title">Einstein AI</div>
+            <a href="/einstein" class="nav-item {{ 'active' if active_page == 'einstein' else '' }}">
+                <span class="nav-icon">🧠</span>
+                <span class="nav-text">Einstein Home</span>
+            </a>
+            <a href="/einstein/predictions" class="nav-item {{ 'active' if active_page == 'predictions' else '' }}">
+                <span class="nav-icon">🔮</span>
+                <span class="nav-text">Predictions</span>
+            </a>
+            <a href="/einstein/analytics" class="nav-item {{ 'active' if active_page == 'analytics' else '' }}">
+                <span class="nav-icon">📈</span>
+                <span class="nav-text">Analytics</span>
+            </a>
+            <a href="/einstein/insights" class="nav-item {{ 'active' if active_page == 'insights' else '' }}">
+                <span class="nav-icon">💡</span>
+                <span class="nav-text">Insights</span>
+            </a>
+        </div>
+        
+        <div class="nav-section">
+            <div class="nav-section-title">DedSec Security</div>
+            <a href="/dedsec" class="nav-item {{ 'active' if active_page == 'dedsec' else '' }}">
+                <span class="nav-icon">🛡️</span>
+                <span class="nav-text">Security Hub</span>
+            </a>
+            <a href="/dedsec/tower" class="nav-item {{ 'active' if active_page == 'tower' else '' }}">
+                <span class="nav-icon">🗼</span>
+                <span class="nav-text">Tower</span>
+            </a>
+            <a href="/dedsec/drones" class="nav-item {{ 'active' if active_page == 'drones' else '' }}">
+                <span class="nav-icon">🚁</span>
+                <span class="nav-text">Drones</span>
+            </a>
+            <a href="/dedsec/cctv" class="nav-item {{ 'active' if active_page == 'cctv' else '' }}">
+                <span class="nav-icon">📹</span>
+                <span class="nav-text">CCTV</span>
+            </a>
+        </div>
+        
+        <div class="nav-section">
+            <div class="nav-section-title">Tools</div>
+            <a href="/whatsapp" class="nav-item {{ 'active' if active_page == 'whatsapp' else '' }}">
+                <span class="nav-icon">💬</span>
+                <span class="nav-text">WhatsApp</span>
+            </a>
+            <a href="/godbot" class="nav-item {{ 'active' if active_page == 'godbot' else '' }}">
+                <span class="nav-icon">🤖</span>
+                <span class="nav-text">GOD BOT</span>
+            </a>
+            <a href="/locker" class="nav-item {{ 'active' if active_page == 'locker' else '' }}">
+                <span class="nav-icon">🔐</span>
+                <span class="nav-text">Locker</span>
+            </a>
+        </div>
+        
+        <div class="nav-section" style="margin-top: auto; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1);">
+            <a href="/logout" class="nav-item">
+                <span class="nav-icon">🚪</span>
+                <span class="nav-text">Logout</span>
+            </a>
+        </div>
+    </nav>
+    
+    <!-- Main Content -->
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+    
+    <script>
+        // Global JS utilities
+        function formatCurrency(value) {
+            return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(value);
+        }
+        
+        function formatNumber(value) {
+            return new Intl.NumberFormat('de-DE').format(value);
+        }
+    </script>
+</body>
+</html>
 '''
 
-def get_sidebar_html(active_page=''):
-    return f'''
-    <nav class="sidebar">
-        <div class="logo">💰 West Money OS</div>
-        <div class="nav-section">
-            <div class="nav-title">Hauptmenü</div>
-            <a href="/dashboard" class="nav-item {'active' if active_page == 'dashboard' else ''}"><span>📊</span> Dashboard</a>
-            <a href="/dashboard/contacts" class="nav-item {'active' if active_page == 'contacts' else ''}"><span>👥</span> Kontakte</a>
-            <a href="/dashboard/leads" class="nav-item {'active' if active_page == 'leads' else ''}"><span>🎯</span> Leads</a>
-            <a href="/dashboard/campaigns" class="nav-item {'active' if active_page == 'campaigns' else ''}"><span>📧</span> Kampagnen</a>
-            <a href="/dashboard/invoices" class="nav-item {'active' if active_page == 'invoices' else ''}"><span>📄</span> Rechnungen</a>
-        </div>
-        <div class="nav-section">
-            <div class="nav-title">Kommunikation</div>
-            <a href="/dashboard/whatsapp" class="nav-item {'active' if active_page == 'whatsapp' else ''}"><span>📱</span> WhatsApp</a>
-            <a href="/dashboard/messages" class="nav-item {'active' if active_page == 'messages' else ''}"><span>💬</span> Nachrichten</a>
-            <a href="/dashboard/ai" class="nav-item {'active' if active_page == 'ai' else ''}"><span>🤖</span> AI Chat</a>
-        </div>
-        <div class="nav-section">
-            <div class="nav-title">Power Modules</div>
-            <a href="/dashboard/broly" class="nav-item {'active' if active_page == 'broly' else ''}"><span>💪</span> Broly Taskforce</a>
-            <a href="/dashboard/einstein" class="nav-item {'active' if active_page == 'einstein' else ''}"><span>🧠</span> Einstein Agency</a>
-            <a href="/dashboard/dedsec" class="nav-item {'active' if active_page == 'dedsec' else ''}"><span>🔐</span> DedSec Security</a>
-            <a href="/dashboard/tokens" class="nav-item {'active' if active_page == 'tokens' else ''}"><span>🪙</span> Token Economy</a>
-        </div>
-        <div class="nav-section">
-            <div class="nav-title">Smart Home</div>
-            <a href="/dashboard/loxone" class="nav-item {'active' if active_page == 'loxone' else ''}"><span>🏠</span> LOXONE</a>
-            <a href="/dashboard/automations" class="nav-item {'active' if active_page == 'automations' else ''}"><span>⚡</span> Z Automations</a>
-        </div>
-        <div class="nav-section">
-            <div class="nav-title">System</div>
-            <a href="/dashboard/settings" class="nav-item {'active' if active_page == 'settings' else ''}"><span>⚙️</span> Einstellungen</a>
-            <a href="/wiki" class="nav-item"><span>📚</span> Wiki</a>
-            <a href="/logout" class="nav-item"><span>🚪</span> Logout</a>
-        </div>
-    </nav>'''
-
-def get_topbar_html(title, user):
-    return f'''
-    <div class="topbar">
-        <h1>{title}</h1>
-        <div class="topbar-right">
-            <div class="token-badge god">🪙 {user.tokens_god} GOD</div>
-            <div class="token-badge dedsec">🔐 {user.tokens_dedsec} DEDSEC</div>
-            <span style="opacity:0.7">Willkommen, {user.name or user.username}!</span>
-        </div>
-    </div>'''
-
-def render_page(title, content, active_page='', user=None):
-    if not user:
-        user = get_current_user()
-    return f'''<!DOCTYPE html>
-<html lang="de">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{title} - West Money OS</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <style>{BASE_CSS}</style>
-</head>
-<body>
-    {get_sidebar_html(active_page)}
-    <main class="main">
-        {get_topbar_html(title, user)}
-        <div class="content fade-in">{content}</div>
-    </main>
-</body>
-</html>'''
-# =============================================================================
-# LANDING PAGE
-# =============================================================================
-LANDING_HTML = '''<!DOCTYPE html>
-<html lang="de">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>West Money OS | All-in-One Business Platform</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Inter', sans-serif; background: #0a0a12; color: #fff; }
-        .navbar { position: fixed; top: 0; width: 100%; padding: 1rem 5%; display: flex; justify-content: space-between; align-items: center; z-index: 1000; background: rgba(10,10,18,0.9); backdrop-filter: blur(20px); }
-        .nav-logo { font-size: 1.5rem; font-weight: 800; background: linear-gradient(135deg, #ffd700, #ff8c00); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .nav-btn { padding: 0.75rem 1.5rem; background: linear-gradient(135deg, #667eea, #764ba2); border-radius: 50px; color: #fff; text-decoration: none; font-weight: 600; }
-        .hero { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 2rem; padding-top: 100px; background: radial-gradient(circle at 50% 50%, rgba(102,126,234,0.1) 0%, transparent 50%); }
-        .hero-badge { background: linear-gradient(135deg, #f97316, #ef4444); padding: 0.5rem 1.5rem; border-radius: 50px; font-weight: 700; font-size: 0.85rem; margin-bottom: 2rem; animation: pulse 2s infinite; }
-        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
-        .hero h1 { font-size: 4rem; font-weight: 800; margin-bottom: 1.5rem; line-height: 1.1; }
-        .hero h1 span { background: linear-gradient(135deg, #667eea, #764ba2, #f97316); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .hero p { font-size: 1.25rem; opacity: 0.7; max-width: 600px; margin-bottom: 3rem; }
-        .hero-btns { display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; }
-        .hero-btns .btn { padding: 1rem 2.5rem; border-radius: 50px; font-size: 1rem; font-weight: 600; text-decoration: none; }
-        .btn-primary { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; }
-        .btn-outline { border: 2px solid rgba(255,255,255,0.3); color: #fff; }
-        .modules { display: grid; grid-template-columns: repeat(6, 1fr); gap: 1rem; margin-top: 4rem; max-width: 900px; }
-        .module { background: rgba(255,255,255,0.05); padding: 1.5rem 1rem; border-radius: 16px; text-align: center; cursor: pointer; }
-        .module:hover { background: rgba(255,255,255,0.1); transform: translateY(-5px); }
-        .module-icon { font-size: 2rem; margin-bottom: 0.5rem; }
-        .module-name { font-size: 0.8rem; }
-        .features { padding: 6rem 5%; background: rgba(0,0,0,0.3); }
-        .features h2 { text-align: center; font-size: 2.5rem; margin-bottom: 3rem; }
-        .features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; max-width: 1200px; margin: 0 auto; }
-        .feature-card { background: linear-gradient(135deg, rgba(102,126,234,0.1), rgba(118,75,162,0.1)); border: 1px solid rgba(102,126,234,0.2); border-radius: 20px; padding: 2rem; }
-        .feature-icon { font-size: 2.5rem; margin-bottom: 1rem; }
-        .feature-card h3 { font-size: 1.25rem; margin-bottom: 0.75rem; }
-        .feature-card p { opacity: 0.7; }
-        footer { padding: 3rem 5%; text-align: center; border-top: 1px solid rgba(255,255,255,0.05); }
-        @media (max-width: 768px) { .hero h1 { font-size: 2.5rem; } .modules { grid-template-columns: repeat(3, 1fr); } }
-    </style>
-</head>
-<body>
-    <nav class="navbar">
-        <div class="nav-logo">💰 West Money OS</div>
-        <a href="/login" class="nav-btn">Login →</a>
-    </nav>
-    <section class="hero">
-        <div class="hero-badge">🔥 v11.0 GODMODE ULTIMATE</div>
-        <h1>Die <span>All-in-One</span><br>Business Platform</h1>
-        <p>CRM, WhatsApp, AI, Payments, Smart Home und Security - alles in einer Plattform.</p>
-        <div class="hero-btns">
-            <a href="/register" class="btn btn-primary">🚀 Kostenlos starten</a>
-            <a href="#features" class="btn btn-outline">Features ansehen</a>
-        </div>
-        <div class="modules">
-            <div class="module"><div class="module-icon">👥</div><div class="module-name">CRM</div></div>
-            <div class="module"><div class="module-icon">📱</div><div class="module-name">WhatsApp</div></div>
-            <div class="module"><div class="module-icon">🤖</div><div class="module-name">AI Chat</div></div>
-            <div class="module"><div class="module-icon">💳</div><div class="module-name">Payments</div></div>
-            <div class="module"><div class="module-icon">🏠</div><div class="module-name">Smart Home</div></div>
-            <div class="module"><div class="module-icon">🔐</div><div class="module-name">Security</div></div>
-        </div>
-    </section>
-    <section class="features" id="features">
-        <h2>Alles was du brauchst</h2>
-        <div class="features-grid">
-            <div class="feature-card"><div class="feature-icon">💪</div><h3>Broly Taskforce</h3><p>Legendäre Automatisierung mit Majin Shield und GOD MODE.</p></div>
-            <div class="feature-card"><div class="feature-icon">🧠</div><h3>Einstein Agency</h3><p>8 spezialisierte AI Bots für Architektur und Smart Home.</p></div>
-            <div class="feature-card"><div class="feature-icon">🔐</div><h3>DedSec Security</h3><p>Enterprise Security mit 24/7 Monitoring.</p></div>
-            <div class="feature-card"><div class="feature-icon">📱</div><h3>WhatsApp Business</h3><p>API Integration mit Consent Management.</p></div>
-            <div class="feature-card"><div class="feature-icon">🪙</div><h3>Token Economy</h3><p>5 Token-Typen für Rewards und Premium Features.</p></div>
-            <div class="feature-card"><div class="feature-icon">🏠</div><h3>LOXONE Smart Home</h3><p>Gold Partner Integration für Gebäudeautomation.</p></div>
-        </div>
-    </section>
-    <footer><p>© 2025 Enterprise Universe GmbH | West Money OS v11.0</p></footer>
-</body>
-</html>'''
-
-LOGIN_HTML = '''<!DOCTYPE html>
-<html lang="de">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - West Money OS</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #0a0a12 0%, #1a1a2e 100%); color: #fff; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
-        .login-container { width: 100%; max-width: 420px; padding: 2rem; }
-        .login-card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 24px; padding: 3rem; backdrop-filter: blur(20px); }
-        .logo { text-align: center; font-size: 3.5rem; margin-bottom: 1rem; }
-        h1 { text-align: center; font-size: 1.75rem; margin-bottom: 0.5rem; }
-        .subtitle { text-align: center; color: #667eea; font-weight: 600; margin-bottom: 2rem; }
-        .form-group { margin-bottom: 1.25rem; }
-        label { display: block; font-size: 0.85rem; font-weight: 500; margin-bottom: 0.5rem; }
-        input { width: 100%; padding: 1rem; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; color: #fff; font-size: 1rem; }
-        input:focus { outline: none; border-color: #667eea; }
-        .btn { width: 100%; padding: 1rem; background: linear-gradient(135deg, #667eea, #764ba2); border: none; border-radius: 12px; color: #fff; font-size: 1rem; font-weight: 600; cursor: pointer; }
-        .btn:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(102,126,234,0.4); }
-        .error { background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); color: #ef4444; padding: 1rem; border-radius: 12px; margin-bottom: 1.5rem; text-align: center; }
-        .links { text-align: center; margin-top: 1.5rem; }
-        .links a { color: #667eea; text-decoration: none; }
-        .demo { text-align: center; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid rgba(255,255,255,0.1); }
-        .demo-title { font-size: 0.75rem; text-transform: uppercase; opacity: 0.5; margin-bottom: 0.5rem; }
-        .demo-creds code { background: rgba(102,126,234,0.2); padding: 0.25rem 0.5rem; border-radius: 4px; }
-    </style>
-</head>
-<body>
-    <div class="login-container">
-        <div class="login-card">
-            <div class="logo">💰</div>
-            <h1>West Money OS</h1>
-            <div class="subtitle">GODMODE v11.0</div>
-            {error}
-            <form method="POST">
-                <div class="form-group">
-                    <label>Benutzername oder E-Mail</label>
-                    <input type="text" name="username" placeholder="admin" required autofocus>
-                </div>
-                <div class="form-group">
-                    <label>Passwort</label>
-                    <input type="password" name="password" placeholder="••••••••" required>
-                </div>
-                <button type="submit" class="btn">🚀 Einloggen</button>
-            </form>
-            <div class="links"><a href="/register">Noch kein Konto? Registrieren</a></div>
-            <div class="demo">
-                <div class="demo-title">Demo-Zugang</div>
-                <div class="demo-creds"><code>admin</code> / <code>663724</code></div>
-            </div>
-        </div>
-    </div>
-</body>
-</html>'''
-
-REGISTER_HTML = '''<!DOCTYPE html>
-<html lang="de">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Registrieren - West Money OS</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #0a0a12 0%, #1a1a2e 100%); color: #fff; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 2rem; }
-        .register-card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 24px; padding: 2.5rem; width: 100%; max-width: 500px; }
-        .logo { text-align: center; font-size: 3rem; margin-bottom: 1rem; }
-        h1 { text-align: center; font-size: 1.5rem; margin-bottom: 2rem; }
-        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-        .form-group { margin-bottom: 1rem; }
-        label { display: block; font-size: 0.85rem; margin-bottom: 0.5rem; }
-        input, select { width: 100%; padding: 0.875rem; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; color: #fff; font-size: 1rem; }
-        input:focus, select:focus { outline: none; border-color: #667eea; }
-        select option { background: #1a1a2e; }
-        .btn { width: 100%; padding: 1rem; background: linear-gradient(135deg, #667eea, #764ba2); border: none; border-radius: 12px; color: #fff; font-weight: 600; cursor: pointer; }
-        .error { background: rgba(239,68,68,0.15); color: #ef4444; padding: 1rem; border-radius: 12px; margin-bottom: 1rem; }
-        .success { background: rgba(34,197,94,0.15); color: #22c55e; padding: 1rem; border-radius: 12px; margin-bottom: 1rem; }
-        .links { text-align: center; margin-top: 1.5rem; }
-        .links a { color: #667eea; text-decoration: none; }
-    </style>
-</head>
-<body>
-    <div class="register-card">
-        <div class="logo">💰</div>
-        <h1>Konto erstellen</h1>
-        {message}
-        <form method="POST">
-            <div class="form-row">
-                <div class="form-group"><label>Vorname</label><input type="text" name="firstname" required></div>
-                <div class="form-group"><label>Nachname</label><input type="text" name="lastname" required></div>
-            </div>
-            <div class="form-group"><label>Benutzername</label><input type="text" name="username" required></div>
-            <div class="form-group"><label>E-Mail</label><input type="email" name="email" required></div>
-            <div class="form-group"><label>Passwort</label><input type="password" name="password" required minlength="6"></div>
-            <div class="form-group">
-                <label>Plan</label>
-                <select name="plan">
-                    <option value="free">Free - €0/Monat</option>
-                    <option value="professional">Professional - €99/Monat</option>
-                    <option value="enterprise">Enterprise - €299/Monat</option>
-                </select>
-            </div>
-            <button type="submit" class="btn">🚀 Konto erstellen</button>
-        </form>
-        <div class="links"><a href="/login">Bereits registriert? Einloggen</a></div>
-    </div>
-</body>
-</html>'''
-
-# =============================================================================
-# AUTH ROUTES
-# =============================================================================
-@app.route('/')
-def landing():
-    return Response(LANDING_HTML, mimetype='text/html')
-
+# ============================================================================
+# ROUTES - AUTHENTICATION
+# ============================================================================
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        username = request.form.get('username', '')
-        password = request.form.get('password', '')
-        user = User.query.filter((User.username == username) | (User.email == username)).first()
-        if user and user.check_password(password):
-            session['user_id'] = user.id
-            session.permanent = True
-            user.last_login = datetime.utcnow()
-            db.session.commit()
+        username = request.form.get('username')
+        password = request.form.get('password')
+        if username == 'admin' and password == '663724':
+            session['logged_in'] = True
+            session['user'] = 'Ömer Hüseyin Coşkun'
             return redirect('/dashboard')
-        return Response(LOGIN_HTML.replace('{error}', '<div class="error">❌ Ungültige Anmeldedaten</div>'), mimetype='text/html')
-    return Response(LOGIN_HTML.replace('{error}', ''), mimetype='text/html')
-
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    if request.method == 'POST':
-        username = request.form.get('username', '').strip()
-        email = request.form.get('email', '').strip()
-        password = request.form.get('password', '')
-        firstname = request.form.get('firstname', '')
-        lastname = request.form.get('lastname', '')
-        plan = request.form.get('plan', 'free')
-        if User.query.filter_by(username=username).first():
-            return Response(REGISTER_HTML.replace('{message}', '<div class="error">❌ Benutzername vergeben</div>'), mimetype='text/html')
-        if User.query.filter_by(email=email).first():
-            return Response(REGISTER_HTML.replace('{message}', '<div class="error">❌ E-Mail registriert</div>'), mimetype='text/html')
-        user = User(username=username, email=email, name=f"{firstname} {lastname}", plan=plan, tokens_god=100)
-        user.set_password(password)
-        db.session.add(user)
-        db.session.commit()
-        award_tokens(user.id, 'god', 50, 'Willkommensbonus')
-        return Response(REGISTER_HTML.replace('{message}', '<div class="success">✅ Konto erstellt! <a href="/login">Jetzt einloggen</a></div>'), mimetype='text/html')
-    return Response(REGISTER_HTML.replace('{message}', ''), mimetype='text/html')
+    
+    return render_template_string('''
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Login | West Money OS</title>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+        <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body {
+                font-family: 'Inter', sans-serif;
+                background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            .login-card {
+                background: rgba(255,255,255,0.05);
+                border: 1px solid rgba(255,255,255,0.1);
+                border-radius: 24px;
+                padding: 48px;
+                width: 100%;
+                max-width: 420px;
+                backdrop-filter: blur(10px);
+            }
+            .logo {
+                text-align: center;
+                margin-bottom: 32px;
+            }
+            .logo-icon {
+                width: 80px;
+                height: 80px;
+                background: linear-gradient(135deg, #FF5722, #FF9800);
+                border-radius: 20px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 40px;
+                margin-bottom: 16px;
+            }
+            .logo-text {
+                font-size: 28px;
+                font-weight: 700;
+                background: linear-gradient(90deg, #FF5722, #FFD700);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+            }
+            .logo-sub {
+                color: rgba(255,255,255,0.5);
+                font-size: 14px;
+            }
+            .form-group {
+                margin-bottom: 20px;
+            }
+            label {
+                display: block;
+                color: rgba(255,255,255,0.7);
+                margin-bottom: 8px;
+                font-size: 14px;
+            }
+            input {
+                width: 100%;
+                padding: 14px 16px;
+                background: rgba(255,255,255,0.05);
+                border: 1px solid rgba(255,255,255,0.2);
+                border-radius: 12px;
+                color: white;
+                font-size: 16px;
+                transition: all 0.3s ease;
+            }
+            input:focus {
+                outline: none;
+                border-color: #FF5722;
+                background: rgba(255,87,34,0.1);
+            }
+            button {
+                width: 100%;
+                padding: 16px;
+                background: linear-gradient(135deg, #FF5722, #FF9800);
+                border: none;
+                border-radius: 12px;
+                color: white;
+                font-size: 16px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.3s ease;
+            }
+            button:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 10px 30px rgba(255,87,34,0.4);
+            }
+            .divider {
+                display: flex;
+                align-items: center;
+                margin: 24px 0;
+                color: rgba(255,255,255,0.3);
+                font-size: 12px;
+            }
+            .divider::before, .divider::after {
+                content: '';
+                flex: 1;
+                height: 1px;
+                background: rgba(255,255,255,0.1);
+            }
+            .divider span { padding: 0 16px; }
+            .certs {
+                display: flex;
+                justify-content: center;
+                gap: 16px;
+                margin-top: 24px;
+            }
+            .cert {
+                font-size: 24px;
+                opacity: 0.5;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="login-card">
+            <div class="logo">
+                <div class="logo-icon">⚡</div>
+                <div class="logo-text">West Money OS</div>
+                <div class="logo-sub">Enterprise Universe GmbH</div>
+            </div>
+            
+            <form method="POST">
+                <div class="form-group">
+                    <label>Benutzername</label>
+                    <input type="text" name="username" placeholder="admin" required>
+                </div>
+                <div class="form-group">
+                    <label>Passwort</label>
+                    <input type="password" name="password" placeholder="••••••" required>
+                </div>
+                <button type="submit">🚀 Anmelden</button>
+            </form>
+            
+            <div class="divider"><span>Zertifiziert & Sicher</span></div>
+            
+            <div class="certs">
+                <span class="cert" title="ISO 27001">🔒</span>
+                <span class="cert" title="DSGVO">🛡️</span>
+                <span class="cert" title="TÜV">✅</span>
+                <span class="cert" title="SSL">🔐</span>
+            </div>
+        </div>
+    </body>
+    </html>
+    ''')
 
 @app.route('/logout')
 def logout():
     session.clear()
     return redirect('/login')
-# =============================================================================
-# DASHBOARD ROUTE
-# =============================================================================
+
+# ============================================================================
+# ROUTES - LANDING PAGE
+# ============================================================================
+@app.route('/')
+def landing():
+    return render_template_string('''
+    <!DOCTYPE html>
+    <html lang="de">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>West Money Bau | Smart Home & Gebäudeautomation</title>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+        <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body {
+                font-family: 'Inter', sans-serif;
+                background: #0a0a0a;
+                color: #ffffff;
+                overflow-x: hidden;
+            }
+            
+            /* Hero Section */
+            .hero {
+                min-height: 100vh;
+                background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #0a0a0a 100%);
+                position: relative;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                text-align: center;
+                padding: 40px 20px;
+            }
+            
+            .hero::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="1" fill="rgba(255,87,34,0.1)"/></svg>');
+                background-size: 50px;
+                opacity: 0.5;
+            }
+            
+            .hero-content {
+                position: relative;
+                z-index: 1;
+                max-width: 900px;
+            }
+            
+            .hero-badge {
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                background: rgba(255,87,34,0.1);
+                border: 1px solid rgba(255,87,34,0.3);
+                padding: 8px 20px;
+                border-radius: 50px;
+                font-size: 14px;
+                margin-bottom: 32px;
+                color: #FF5722;
+            }
+            
+            .hero-title {
+                font-size: clamp(40px, 8vw, 80px);
+                font-weight: 800;
+                line-height: 1.1;
+                margin-bottom: 24px;
+            }
+            
+            .hero-title span {
+                background: linear-gradient(90deg, #FF5722, #FFD700, #FF5722);
+                background-size: 200% auto;
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                animation: gradient 3s ease infinite;
+            }
+            
+            @keyframes gradient {
+                0%, 100% { background-position: 0% center; }
+                50% { background-position: 100% center; }
+            }
+            
+            .hero-subtitle {
+                font-size: clamp(18px, 3vw, 24px);
+                color: rgba(255,255,255,0.7);
+                margin-bottom: 40px;
+                line-height: 1.6;
+            }
+            
+            .hero-buttons {
+                display: flex;
+                gap: 16px;
+                justify-content: center;
+                flex-wrap: wrap;
+            }
+            
+            .btn {
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                padding: 16px 32px;
+                border-radius: 12px;
+                font-weight: 600;
+                font-size: 16px;
+                text-decoration: none;
+                transition: all 0.3s ease;
+            }
+            
+            .btn-primary {
+                background: linear-gradient(135deg, #FF5722, #FF9800);
+                color: white;
+            }
+            
+            .btn-primary:hover {
+                transform: translateY(-4px);
+                box-shadow: 0 20px 40px rgba(255,87,34,0.4);
+            }
+            
+            .btn-secondary {
+                background: rgba(255,255,255,0.05);
+                border: 1px solid rgba(255,255,255,0.2);
+                color: white;
+            }
+            
+            .btn-secondary:hover {
+                background: rgba(255,255,255,0.1);
+            }
+            
+            /* Stats Section */
+            .stats {
+                display: grid;
+                grid-template-columns: repeat(4, 1fr);
+                gap: 2px;
+                background: rgba(255,255,255,0.1);
+                margin: 60px 0;
+            }
+            
+            .stat {
+                background: #0a0a0a;
+                padding: 40px 20px;
+                text-align: center;
+            }
+            
+            .stat-value {
+                font-size: 48px;
+                font-weight: 800;
+                background: linear-gradient(90deg, #FF5722, #FFD700);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+            }
+            
+            .stat-label {
+                color: rgba(255,255,255,0.6);
+                margin-top: 8px;
+            }
+            
+            /* Certifications Section */
+            .section {
+                padding: 100px 40px;
+                max-width: 1400px;
+                margin: 0 auto;
+            }
+            
+            .section-title {
+                font-size: 40px;
+                font-weight: 700;
+                text-align: center;
+                margin-bottom: 60px;
+            }
+            
+            .section-title span {
+                background: linear-gradient(90deg, #FF5722, #FFD700);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+            }
+            
+            .cert-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                gap: 24px;
+            }
+            
+            .cert-card {
+                background: rgba(255,255,255,0.03);
+                border: 1px solid rgba(255,255,255,0.1);
+                border-radius: 20px;
+                padding: 32px;
+                text-align: center;
+                transition: all 0.3s ease;
+            }
+            
+            .cert-card:hover {
+                transform: translateY(-8px);
+                border-color: #FF5722;
+                background: rgba(255,87,34,0.05);
+            }
+            
+            .cert-icon {
+                font-size: 48px;
+                margin-bottom: 16px;
+            }
+            
+            .cert-name {
+                font-size: 18px;
+                font-weight: 600;
+                margin-bottom: 8px;
+            }
+            
+            .cert-desc {
+                color: rgba(255,255,255,0.5);
+                font-size: 14px;
+            }
+            
+            /* Awards Section */
+            .awards-grid {
+                display: flex;
+                flex-wrap: wrap;
+                justify-content: center;
+                gap: 24px;
+            }
+            
+            .award-card {
+                background: linear-gradient(135deg, rgba(255,215,0,0.1), rgba(255,87,34,0.05));
+                border: 1px solid rgba(255,215,0,0.3);
+                border-radius: 16px;
+                padding: 24px 32px;
+                display: flex;
+                align-items: center;
+                gap: 16px;
+                transition: all 0.3s ease;
+            }
+            
+            .award-card:hover {
+                transform: scale(1.05);
+            }
+            
+            .award-icon {
+                font-size: 40px;
+            }
+            
+            .award-name {
+                font-weight: 600;
+            }
+            
+            .award-org {
+                font-size: 12px;
+                color: rgba(255,255,255,0.5);
+            }
+            
+            /* Features Section */
+            .features-grid {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 32px;
+            }
+            
+            .feature-card {
+                background: rgba(255,255,255,0.02);
+                border: 1px solid rgba(255,255,255,0.1);
+                border-radius: 20px;
+                padding: 40px;
+                transition: all 0.3s ease;
+            }
+            
+            .feature-card:hover {
+                border-color: #FF5722;
+                transform: translateY(-8px);
+            }
+            
+            .feature-icon {
+                width: 64px;
+                height: 64px;
+                background: linear-gradient(135deg, #FF5722, #FF9800);
+                border-radius: 16px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 28px;
+                margin-bottom: 24px;
+            }
+            
+            .feature-title {
+                font-size: 20px;
+                font-weight: 600;
+                margin-bottom: 12px;
+            }
+            
+            .feature-desc {
+                color: rgba(255,255,255,0.6);
+                line-height: 1.6;
+            }
+            
+            /* Footer */
+            footer {
+                background: #050505;
+                padding: 60px 40px 30px;
+                border-top: 1px solid rgba(255,255,255,0.1);
+            }
+            
+            .footer-content {
+                max-width: 1400px;
+                margin: 0 auto;
+                display: grid;
+                grid-template-columns: 2fr 1fr 1fr 1fr;
+                gap: 60px;
+            }
+            
+            .footer-logo {
+                font-size: 24px;
+                font-weight: 700;
+                background: linear-gradient(90deg, #FF5722, #FFD700);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                margin-bottom: 16px;
+            }
+            
+            .footer-desc {
+                color: rgba(255,255,255,0.5);
+                line-height: 1.6;
+                margin-bottom: 20px;
+            }
+            
+            .footer-title {
+                font-weight: 600;
+                margin-bottom: 20px;
+            }
+            
+            .footer-links {
+                list-style: none;
+            }
+            
+            .footer-links a {
+                color: rgba(255,255,255,0.5);
+                text-decoration: none;
+                display: block;
+                padding: 8px 0;
+                transition: color 0.3s ease;
+            }
+            
+            .footer-links a:hover {
+                color: #FF5722;
+            }
+            
+            .footer-bottom {
+                max-width: 1400px;
+                margin: 40px auto 0;
+                padding-top: 20px;
+                border-top: 1px solid rgba(255,255,255,0.1);
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                color: rgba(255,255,255,0.4);
+                font-size: 14px;
+            }
+            
+            .footer-certs {
+                display: flex;
+                gap: 12px;
+            }
+            
+            .footer-certs span {
+                font-size: 20px;
+            }
+            
+            /* Responsive */
+            @media (max-width: 1024px) {
+                .stats { grid-template-columns: repeat(2, 1fr); }
+                .features-grid { grid-template-columns: 1fr; }
+                .footer-content { grid-template-columns: 1fr 1fr; }
+            }
+            
+            @media (max-width: 768px) {
+                .stats { grid-template-columns: 1fr; }
+                .hero-buttons { flex-direction: column; }
+                .footer-content { grid-template-columns: 1fr; }
+                .footer-bottom { flex-direction: column; gap: 16px; }
+            }
+        </style>
+    </head>
+    <body>
+        <!-- Navigation -->
+        <nav style="position: fixed; top: 0; left: 0; right: 0; z-index: 1000; background: rgba(10,10,10,0.9); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(255,255,255,0.1);">
+            <div style="max-width: 1400px; margin: 0 auto; padding: 16px 40px; display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #FF5722, #FF9800); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px;">⚡</div>
+                    <span style="font-weight: 700; font-size: 18px;">West Money Bau</span>
+                </div>
+                <div style="display: flex; gap: 32px; align-items: center;">
+                    <a href="#services" style="color: rgba(255,255,255,0.7); text-decoration: none;">Services</a>
+                    <a href="#about" style="color: rgba(255,255,255,0.7); text-decoration: none;">Über Uns</a>
+                    <a href="#contact" style="color: rgba(255,255,255,0.7); text-decoration: none;">Kontakt</a>
+                    <a href="/login" class="btn btn-primary" style="padding: 10px 24px;">Login</a>
+                </div>
+            </div>
+        </nav>
+        
+        <!-- Hero Section -->
+        <section class="hero">
+            <div class="hero-content">
+                <div class="hero-badge">
+                    🏆 Ausgezeichnet als Top Smart Home Company 2024
+                </div>
+                <h1 class="hero-title">
+                    Intelligente<br><span>Gebäudeautomation</span><br>für die Zukunft
+                </h1>
+                <p class="hero-subtitle">
+                    West Money Bau – Ihr Partner für Smart Home, LOXONE Integration und 
+                    nachhaltige Bauprojekte. ISO-zertifiziert, DSGVO-konform, zukunftssicher.
+                </p>
+                <div class="hero-buttons">
+                    <a href="/login" class="btn btn-primary">🚀 Jetzt Starten</a>
+                    <a href="#services" class="btn btn-secondary">📋 Mehr Erfahren</a>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Stats -->
+        <div class="stats">
+            <div class="stat">
+                <div class="stat-value">€847K</div>
+                <div class="stat-label">Umsatz 2024</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">150+</div>
+                <div class="stat-label">Projekte</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">98%</div>
+                <div class="stat-label">Kundenzufriedenheit</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">24/7</div>
+                <div class="stat-label">Support</div>
+            </div>
+        </div>
+        
+        <!-- Certifications -->
+        <section class="section" id="certifications">
+            <h2 class="section-title">Unsere <span>Zertifizierungen</span></h2>
+            <div class="cert-grid">
+                {% for cert in certifications %}
+                <div class="cert-card">
+                    <div class="cert-icon">{{ cert.icon }}</div>
+                    <div class="cert-name">{{ cert.name }}</div>
+                    <div class="cert-desc">{{ cert.desc }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+        
+        <!-- Awards -->
+        <section class="section" style="background: linear-gradient(180deg, rgba(255,215,0,0.05), transparent);">
+            <h2 class="section-title">Auszeichnungen & <span>Awards</span></h2>
+            <div class="awards-grid">
+                {% for award in awards %}
+                <div class="award-card">
+                    <div class="award-icon">{{ award.icon }}</div>
+                    <div>
+                        <div class="award-name">{{ award.name }}</div>
+                        <div class="award-org">{{ award.org }}</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+        
+        <!-- Features -->
+        <section class="section" id="services">
+            <h2 class="section-title">Unsere <span>Services</span></h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🏠</div>
+                    <div class="feature-title">Smart Home</div>
+                    <div class="feature-desc">LOXONE Platinum Partner - Komplette Gebäudeautomation für Licht, Heizung, Sicherheit und mehr.</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🔒</div>
+                    <div class="feature-title">Security Systems</div>
+                    <div class="feature-desc">DedSec Security - Professionelle Alarmsysteme, CCTV, Zutrittskontrolle und Drohnenüberwachung.</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🧠</div>
+                    <div class="feature-title">Einstein AI</div>
+                    <div class="feature-desc">KI-gestützte Prognosen, Analytics und Automatisierung für Ihre Bauprojekte.</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🏗️</div>
+                    <div class="feature-title">Bauausführung</div>
+                    <div class="feature-desc">Barrierefreies Bauen, Sanierung und schlüsselfertige Projekte im Rhein-Main-Gebiet.</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">☀️</div>
+                    <div class="feature-title">Photovoltaik</div>
+                    <div class="feature-desc">Solaranlagen, Speichersysteme und Wallboxen für Ihre Energieunabhängigkeit.</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📊</div>
+                    <div class="feature-title">West Money OS</div>
+                    <div class="feature-desc">Unsere SaaS-Plattform für CRM, Projektmanagement und Business Intelligence.</div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- CTA -->
+        <section style="padding: 100px 40px; background: linear-gradient(135deg, #FF5722, #FF9800); text-align: center;">
+            <h2 style="font-size: 40px; font-weight: 700; margin-bottom: 20px;">Bereit für die Zukunft?</h2>
+            <p style="font-size: 20px; opacity: 0.9; margin-bottom: 40px;">Starten Sie jetzt mit West Money OS und digitalisieren Sie Ihr Business.</p>
+            <a href="/login" class="btn" style="background: white; color: #FF5722; padding: 20px 48px; font-size: 18px;">🚀 Kostenlos Testen</a>
+        </section>
+        
+        <!-- Footer -->
+        <footer id="contact">
+            <div class="footer-content">
+                <div>
+                    <div class="footer-logo">⚡ West Money Bau</div>
+                    <p class="footer-desc">Enterprise Universe GmbH<br>Ihr Partner für Smart Home & Gebäudeautomation im Rhein-Main-Gebiet.</p>
+                    <p style="color: rgba(255,255,255,0.5); font-size: 14px;">
+                        📍 Frankfurt am Main<br>
+                        📞 +49 (0) 69 XXX XXXX<br>
+                        ✉️ info@west-money.com
+                    </p>
+                </div>
+                <div>
+                    <div class="footer-title">Services</div>
+                    <ul class="footer-links">
+                        <li><a href="#">Smart Home</a></li>
+                        <li><a href="#">Sicherheitstechnik</a></li>
+                        <li><a href="#">Photovoltaik</a></li>
+                        <li><a href="#">Bauausführung</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <div class="footer-title">Unternehmen</div>
+                    <ul class="footer-links">
+                        <li><a href="#">Über Uns</a></li>
+                        <li><a href="#">Karriere</a></li>
+                        <li><a href="#">Partner</a></li>
+                        <li><a href="#">Presse</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <div class="footer-title">Rechtliches</div>
+                    <ul class="footer-links">
+                        <li><a href="#">Impressum</a></li>
+                        <li><a href="#">Datenschutz</a></li>
+                        <li><a href="#">AGB</a></li>
+                        <li><a href="#">Cookie-Richtlinie</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <span>© 2024-2026 Enterprise Universe GmbH. Alle Rechte vorbehalten.</span>
+                <div class="footer-certs">
+                    <span title="ISO 9001">🏅</span>
+                    <span title="ISO 27001">🔒</span>
+                    <span title="DSGVO">🛡️</span>
+                    <span title="TÜV">✅</span>
+                    <span title="LOXONE">🏠</span>
+                </div>
+            </div>
+        </footer>
+    </body>
+    </html>
+    ''', certifications=CERTIFICATIONS, awards=AWARDS)
+
+# ============================================================================
+# ROUTES - DASHBOARD
+# ============================================================================
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    user = get_current_user()
-    contacts_count = Contact.query.count()
-    leads_count = Lead.query.count()
-    leads_value = db.session.query(db.func.sum(Lead.value)).scalar() or 0
-    tasks_pending = Task.query.filter_by(status='pending').count()
-    
-    content = f'''
-    <div class="stats-grid">
-        <div class="stat-card"><div class="stat-value">{contacts_count}</div><div class="stat-label">Kontakte</div></div>
-        <div class="stat-card"><div class="stat-value">{leads_count}</div><div class="stat-label">Aktive Leads</div></div>
-        <div class="stat-card"><div class="stat-value">€{leads_value:,.0f}</div><div class="stat-label">Pipeline Wert</div></div>
-        <div class="stat-card"><div class="stat-value">{tasks_pending}</div><div class="stat-label">Offene Tasks</div></div>
-    </div>
-    <h2 style="margin-bottom:1.5rem">🚀 Power Module</h2>
-    <div class="grid-3">
-        <a href="/dashboard/broly" class="card" style="cursor:pointer">
-            <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1rem">
-                <span style="font-size:2.5rem">💪</span>
-                <div><div style="font-weight:600">Broly Taskforce</div><span class="badge badge-warning">LEGENDARY</span></div>
-            </div>
-            <p style="opacity:0.7;font-size:0.9rem">Legendäre Automatisierung mit GOD MODE.</p>
-        </a>
-        <a href="/dashboard/einstein" class="card" style="cursor:pointer">
-            <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1rem">
-                <span style="font-size:2.5rem">🧠</span>
-                <div><div style="font-weight:600">Einstein Agency</div><span class="badge badge-purple">GENIUS</span></div>
-            </div>
-            <p style="opacity:0.7;font-size:0.9rem">8 AI Bots für Architektur und Smart Home.</p>
-        </a>
-        <a href="/dashboard/dedsec" class="card" style="cursor:pointer">
-            <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1rem">
-                <span style="font-size:2.5rem">🔐</span>
-                <div><div style="font-weight:600">DedSec Security</div><span class="badge badge-success">SECURE</span></div>
-            </div>
-            <p style="opacity:0.7;font-size:0.9rem">Enterprise Security mit 24/7 Monitoring.</p>
-        </a>
-        <a href="/dashboard/tokens" class="card" style="cursor:pointer">
-            <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1rem">
-                <span style="font-size:2.5rem">🪙</span>
-                <div><div style="font-weight:600">Token Economy</div><span class="badge badge-info">ACTIVE</span></div>
-            </div>
-            <p style="opacity:0.7;font-size:0.9rem">GOD, DedSec, OG, Tower Tokens.</p>
-        </a>
-        <a href="/dashboard/whatsapp" class="card" style="cursor:pointer">
-            <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1rem">
-                <span style="font-size:2.5rem">📱</span>
-                <div><div style="font-weight:600">WhatsApp Business</div><span class="badge badge-success">CONNECTED</span></div>
-            </div>
-            <p style="opacity:0.7;font-size:0.9rem">Business API mit Consent Management.</p>
-        </a>
-        <a href="/dashboard/loxone" class="card" style="cursor:pointer">
-            <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1rem">
-                <span style="font-size:2.5rem">🏠</span>
-                <div><div style="font-weight:600">LOXONE Smart Home</div><span class="badge" style="background:rgba(255,215,0,0.2);color:#ffd700">GOLD</span></div>
-            </div>
-            <p style="opacity:0.7;font-size:0.9rem">Vollständige Gebäudeautomation.</p>
-        </a>
-    </div>
-    <div style="display:flex;gap:1rem;margin-top:2rem;flex-wrap:wrap">
-        <a href="/dashboard/contacts" class="btn btn-primary">+ Neuer Kontakt</a>
-        <a href="/dashboard/leads" class="btn btn-primary">+ Neuer Lead</a>
-        <a href="/dashboard/ai" class="btn btn-secondary">🤖 AI Chat öffnen</a>
-    </div>'''
-    return Response(render_page('Dashboard', content, 'dashboard', user), mimetype='text/html')
-
-# =============================================================================
-# CONTACTS PAGE
-# =============================================================================
-@app.route('/dashboard/contacts')
-@login_required
-def contacts_page():
-    user = get_current_user()
-    contacts = Contact.query.order_by(Contact.created_at.desc()).limit(100).all()
-    rows = ''
-    for c in contacts:
-        consent = '<span class="badge badge-success">✓</span>' if c.whatsapp_consent else '<span class="badge badge-danger">✗</span>'
-        rows += f'<tr onclick="editContact({c.id})" style="cursor:pointer"><td><strong>{c.name}</strong></td><td>{c.email or "-"}</td><td>{c.phone or "-"}</td><td>{c.company or "-"}</td><td>{consent}</td><td><button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();editContact({c.id})">✏️</button> <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteContact({c.id})">🗑️</button></td></tr>'
-    if not contacts:
-        rows = '<tr><td colspan="6" class="empty-state"><div class="empty-icon">👥</div><div>Keine Kontakte</div></td></tr>'
-    content = f'''
-    <div class="card">
-        <div class="card-header"><div class="card-title">👥 Kontakte ({len(contacts)})</div><button class="btn btn-primary" onclick="openModal('contact-modal')">+ Neuer Kontakt</button></div>
-        <div class="table-container"><table><thead><tr><th>Name</th><th>E-Mail</th><th>Telefon</th><th>Firma</th><th>WhatsApp</th><th>Aktionen</th></tr></thead><tbody>{rows}</tbody></table></div>
-    </div>
-    <div id="contact-modal" class="modal-overlay" onclick="if(event.target===this)closeModal('contact-modal')">
-        <div class="modal">
-            <div class="modal-header"><div class="modal-title">Kontakt</div><button class="modal-close" onclick="closeModal('contact-modal')">&times;</button></div>
-            <form id="contact-form" onsubmit="saveContact(event)">
-                <input type="hidden" name="id" id="contact-id">
-                <div class="form-group"><label class="form-label">Name *</label><input type="text" id="contact-name" class="form-input" required></div>
-                <div class="grid-2">
-                    <div class="form-group"><label class="form-label">E-Mail</label><input type="email" id="contact-email" class="form-input"></div>
-                    <div class="form-group"><label class="form-label">Telefon</label><input type="tel" id="contact-phone" class="form-input"></div>
-                </div>
-                <div class="grid-2">
-                    <div class="form-group"><label class="form-label">Firma</label><input type="text" id="contact-company" class="form-input"></div>
-                    <div class="form-group"><label class="form-label">Position</label><input type="text" id="contact-position" class="form-input"></div>
-                </div>
-                <div class="form-group"><label class="form-label">Tags</label><input type="text" id="contact-tags" class="form-input" placeholder="VIP, Kunde, Lead"></div>
-                <div class="form-group"><label><input type="checkbox" id="contact-consent"> WhatsApp Einwilligung</label></div>
-                <div class="form-group"><label class="form-label">Notizen</label><textarea id="contact-notes" class="form-input"></textarea></div>
-                <button type="submit" class="btn btn-primary" style="width:100%">💾 Speichern</button>
-            </form>
+    content = '''
+    {% extends "base" %}
+    {% block content %}
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Dashboard</h1>
+            <p class="page-subtitle">Willkommen zurück, {{ user }}</p>
+        </div>
+        <div style="display: flex; gap: 12px;">
+            <a href="/einstein/predictions" class="btn btn-primary">🔮 Einstein Predictions</a>
+            <a href="/dedsec" class="btn btn-secondary">🛡️ Security Status</a>
         </div>
     </div>
+    
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-value">€3.6M</div>
+            <div class="stat-label">Pipeline Value</div>
+            <div class="stat-change positive">↑ 23.5% vs. Vormonat</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">59</div>
+            <div class="stat-label">Aktive Leads</div>
+            <div class="stat-change positive">↑ 12 diese Woche</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">87%</div>
+            <div class="stat-label">Conversion Rate</div>
+            <div class="stat-change positive">↑ 5.2%</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">€847K</div>
+            <div class="stat-label">Umsatz 2024</div>
+            <div class="stat-change positive">↑ 23.5% YoY</div>
+        </div>
+    </div>
+    
+    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px;">
+        <div class="card">
+            <div class="card-title">📈 Pipeline Overview</div>
+            <canvas id="pipelineChart" height="200"></canvas>
+        </div>
+        
+        <div class="card einstein-card">
+            <div class="card-title">🧠 Einstein Insights</div>
+            <div style="space-y: 16px;">
+                <div style="padding: 16px; background: rgba(255,255,255,0.05); border-radius: 12px; margin-bottom: 12px;">
+                    <div style="font-size: 14px; color: rgba(255,255,255,0.6);">Top Prediction</div>
+                    <div style="font-weight: 600; margin-top: 4px;">Thomas Moser - 87% Conversion</div>
+                </div>
+                <div style="padding: 16px; background: rgba(255,255,255,0.05); border-radius: 12px; margin-bottom: 12px;">
+                    <div style="font-size: 14px; color: rgba(255,255,255,0.6);">Empfehlung</div>
+                    <div style="font-weight: 600; margin-top: 4px;">Kontaktiere Mainova AG diese Woche</div>
+                </div>
+                <a href="/einstein/predictions" class="btn btn-primary" style="width: 100%; justify-content: center;">Alle Predictions →</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card" style="margin-top: 24px;">
+        <div class="card-title">🔥 Hot Leads (Score 90+)</div>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Score</th>
+                        <th>Name</th>
+                        <th>Unternehmen</th>
+                        <th>Position</th>
+                        <th>Stage</th>
+                        <th>Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for lead in leads[:5] %}
+                    <tr>
+                        <td>
+                            <div class="score-badge score-high">{{ lead.score }}</div>
+                        </td>
+                        <td><strong>{{ lead.name }}</strong></td>
+                        <td>{{ lead.company }}</td>
+                        <td>{{ lead.position }}</td>
+                        <td><span class="badge badge-{% if lead.stage == 'won' %}success{% elif lead.stage == 'negotiation' %}warning{% else %}info{% endif %}">{{ lead.stage }}</span></td>
+                        <td>€{{ "{:,.0f}".format(lead.value) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <a href="/dashboard/leads" style="display: block; text-align: center; padding: 16px; color: #FF5722; text-decoration: none;">Alle 59 Leads anzeigen →</a>
+    </div>
+    
     <script>
-    function openModal(id) {{ document.getElementById(id).classList.add('active'); }}
-    function closeModal(id) {{ document.getElementById(id).classList.remove('active'); document.getElementById('contact-form').reset(); }}
-    async function saveContact(e) {{
-        e.preventDefault();
-        const id = document.getElementById('contact-id').value;
-        const data = {{ name: document.getElementById('contact-name').value, email: document.getElementById('contact-email').value, phone: document.getElementById('contact-phone').value, company: document.getElementById('contact-company').value, position: document.getElementById('contact-position').value, tags: document.getElementById('contact-tags').value, whatsapp_consent: document.getElementById('contact-consent').checked, notes: document.getElementById('contact-notes').value }};
-        await fetch(id ? `/api/contacts/${{id}}` : '/api/contacts', {{ method: id ? 'PUT' : 'POST', headers: {{'Content-Type': 'application/json'}}, body: JSON.stringify(data) }});
-        location.reload();
-    }}
-    async function editContact(id) {{
-        const res = await fetch(`/api/contacts/${{id}}`);
-        const data = await res.json();
-        if (data.success) {{
-            const c = data.contact;
-            document.getElementById('contact-id').value = c.id;
-            document.getElementById('contact-name').value = c.name;
-            document.getElementById('contact-email').value = c.email || '';
-            document.getElementById('contact-phone').value = c.phone || '';
-            document.getElementById('contact-company').value = c.company || '';
-            document.getElementById('contact-position').value = c.position || '';
-            document.getElementById('contact-tags').value = (c.tags || []).join(', ');
-            document.getElementById('contact-consent').checked = c.whatsapp_consent;
-            document.getElementById('contact-notes').value = c.notes || '';
-            openModal('contact-modal');
-        }}
-    }}
-    async function deleteContact(id) {{ if(confirm('Löschen?')) {{ await fetch(`/api/contacts/${{id}}`, {{method:'DELETE'}}); location.reload(); }} }}
-    </script>'''
-    return Response(render_page('Kontakte', content, 'contacts', user), mimetype='text/html')
+        // Pipeline Chart
+        const ctx = document.getElementById('pipelineChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['New', 'Contacted', 'Qualified', 'Proposal', 'Negotiation', 'Won'],
+                datasets: [{
+                    label: 'Leads',
+                    data: [11, 7, 5, 4, 5, 3],
+                    backgroundColor: [
+                        'rgba(33, 150, 243, 0.8)',
+                        'rgba(156, 39, 176, 0.8)',
+                        'rgba(255, 152, 0, 0.8)',
+                        'rgba(255, 87, 34, 0.8)',
+                        'rgba(233, 30, 99, 0.8)',
+                        'rgba(76, 175, 80, 0.8)'
+                    ],
+                    borderRadius: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: 'rgba(255,255,255,0.6)' } },
+                    x: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.6)' } }
+                }
+            }
+        });
+    </script>
+    {% endblock %}
+    '''
+    return render_template_string(BASE_TEMPLATE + content, 
+                                  title="Dashboard", 
+                                  active_page="dashboard",
+                                  user=session.get('user', 'Admin'),
+                                  leads=LEADS_DATA)
 
-# =============================================================================
-# LEADS PAGE
-# =============================================================================
+# ============================================================================
+# ROUTES - LEADS
+# ============================================================================
 @app.route('/dashboard/leads')
 @login_required
-def leads_page():
-    user = get_current_user()
-    stages = [('new', '🆕 Neu'), ('qualified', '✅ Qualifiziert'), ('proposal', '📝 Angebot'), ('negotiation', '🤝 Verhandlung'), ('won', '🏆 Gewonnen'), ('lost', '❌ Verloren')]
-    pipeline_html = ''
-    for status, title in stages:
-        leads = Lead.query.filter_by(status=status).all()
-        total = sum(l.value for l in leads)
-        cards = ''.join([f'<div class="pipeline-card" onclick="editLead({l.id})"><div class="pipeline-card-title">{l.title}</div><div class="pipeline-card-meta">{l.contact_name or l.company or "N/A"}</div><div class="pipeline-card-value">€{l.value:,.0f}</div></div>' for l in leads])
-        pipeline_html += f'<div class="pipeline-column"><div class="pipeline-header"><span>{title}</span><span class="pipeline-count">{len(leads)} | €{total:,.0f}</span></div>{cards}</div>'
-    content = f'''
+def leads():
+    content = '''
+    {% extends "base" %}
+    {% block content %}
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Lead Management</h1>
+            <p class="page-subtitle">59 Leads | Pipeline: €3.6M</p>
+        </div>
+        <div style="display: flex; gap: 12px;">
+            <button class="btn btn-secondary">📥 Import</button>
+            <button class="btn btn-primary">➕ Neuer Lead</button>
+        </div>
+    </div>
+    
     <div class="card">
-        <div class="card-header"><div class="card-title">🎯 Sales Pipeline</div><button class="btn btn-primary" onclick="openModal('lead-modal')">+ Neuer Lead</button></div>
-        <div class="pipeline">{pipeline_html}</div>
-    </div>
-    <div id="lead-modal" class="modal-overlay" onclick="if(event.target===this)closeModal('lead-modal')">
-        <div class="modal">
-            <div class="modal-header"><div class="modal-title">Lead</div><button class="modal-close" onclick="closeModal('lead-modal')">&times;</button></div>
-            <form id="lead-form" onsubmit="saveLead(event)">
-                <input type="hidden" id="lead-id">
-                <div class="form-group"><label class="form-label">Titel *</label><input type="text" id="lead-title" class="form-input" required></div>
-                <div class="grid-2">
-                    <div class="form-group"><label class="form-label">Kontakt</label><input type="text" id="lead-contact" class="form-input"></div>
-                    <div class="form-group"><label class="form-label">Firma</label><input type="text" id="lead-company" class="form-input"></div>
-                </div>
-                <div class="grid-2">
-                    <div class="form-group"><label class="form-label">Wert (€)</label><input type="number" id="lead-value" class="form-input" value="0"></div>
-                    <div class="form-group"><label class="form-label">Status</label><select id="lead-status" class="form-input"><option value="new">Neu</option><option value="qualified">Qualifiziert</option><option value="proposal">Angebot</option><option value="negotiation">Verhandlung</option><option value="won">Gewonnen</option><option value="lost">Verloren</option></select></div>
-                </div>
-                <div class="form-group"><label class="form-label">Priorität</label><select id="lead-priority" class="form-input"><option value="low">Niedrig</option><option value="medium" selected>Mittel</option><option value="high">Hoch</option></select></div>
-                <div class="form-group"><label class="form-label">Notizen</label><textarea id="lead-notes" class="form-input"></textarea></div>
-                <button type="submit" class="btn btn-primary" style="width:100%">💾 Speichern</button>
-            </form>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Score</th>
+                        <th>Name</th>
+                        <th>Unternehmen</th>
+                        <th>Position</th>
+                        <th>Stage</th>
+                        <th>Value</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for lead in leads %}
+                    <tr>
+                        <td>
+                            <div class="score-badge {% if lead.score >= 90 %}score-high{% elif lead.score >= 70 %}score-medium{% else %}score-low{% endif %}">{{ lead.score }}</div>
+                        </td>
+                        <td><strong>{{ lead.name }}</strong></td>
+                        <td>{{ lead.company }}</td>
+                        <td>{{ lead.position }}</td>
+                        <td>
+                            <span class="badge badge-{% if lead.stage == 'won' %}success{% elif lead.stage == 'negotiation' %}warning{% elif lead.stage == 'proposal' %}purple{% else %}info{% endif %}">
+                                {{ lead.stage }}
+                            </span>
+                        </td>
+                        <td>€{{ "{:,.0f}".format(lead.value) }}</td>
+                        <td>
+                            <button class="btn btn-secondary" style="padding: 6px 12px;">👁️</button>
+                            <button class="btn btn-secondary" style="padding: 6px 12px;">✏️</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
-    <script>
-    function openModal(id) {{ document.getElementById(id).classList.add('active'); }}
-    function closeModal(id) {{ document.getElementById(id).classList.remove('active'); document.getElementById('lead-form').reset(); }}
-    async function saveLead(e) {{
-        e.preventDefault();
-        const id = document.getElementById('lead-id').value;
-        const data = {{ title: document.getElementById('lead-title').value, contact_name: document.getElementById('lead-contact').value, company: document.getElementById('lead-company').value, value: parseFloat(document.getElementById('lead-value').value) || 0, status: document.getElementById('lead-status').value, priority: document.getElementById('lead-priority').value, notes: document.getElementById('lead-notes').value }};
-        await fetch(id ? `/api/leads/${{id}}` : '/api/leads', {{ method: id ? 'PUT' : 'POST', headers: {{'Content-Type': 'application/json'}}, body: JSON.stringify(data) }});
-        location.reload();
-    }}
-    async function editLead(id) {{
-        const res = await fetch(`/api/leads/${{id}}`);
-        const data = await res.json();
-        if (data.success) {{
-            const l = data.lead;
-            document.getElementById('lead-id').value = l.id;
-            document.getElementById('lead-title').value = l.title;
-            document.getElementById('lead-contact').value = l.contact_name || '';
-            document.getElementById('lead-company').value = l.company || '';
-            document.getElementById('lead-value').value = l.value;
-            document.getElementById('lead-status').value = l.status;
-            document.getElementById('lead-priority').value = l.priority;
-            document.getElementById('lead-notes').value = l.notes || '';
-            openModal('lead-modal');
-        }}
-    }}
-    </script>'''
-    return Response(render_page('Leads', content, 'leads', user), mimetype='text/html')
-# =============================================================================
-# AI CHAT PAGE
-# =============================================================================
-@app.route('/dashboard/ai')
-@login_required
-def ai_chat_page():
-    user = get_current_user()
-    history = ChatHistory.query.filter_by(user_id=user.id).order_by(ChatHistory.created_at.desc()).limit(50).all()
-    history.reverse()
-    messages_html = ''.join([f'<div class="chat-message {msg.role}"><div class="chat-bubble">{msg.content}</div></div>' for msg in history])
-    if not history:
-        messages_html = '<div style="text-align:center;padding:4rem;opacity:0.6"><div style="font-size:4rem;margin-bottom:1rem">🤖</div><h3>Willkommen beim AI Chat!</h3><p>Ich bin Claude, dein KI-Assistent.</p></div>'
-    content = f'''
-    <div class="card" style="height:calc(100vh - 180px);display:flex;flex-direction:column;padding:0">
-        <div class="card-header" style="padding:1rem 1.5rem;border-bottom:1px solid rgba(255,255,255,0.1)"><div class="card-title">🤖 AI Chat (Claude)</div><button class="btn btn-sm btn-secondary" onclick="clearChat()">🗑️ Chat leeren</button></div>
-        <div class="chat-messages" id="chat-messages">{messages_html}</div>
-        <div class="chat-input-container">
-            <textarea id="chat-input" class="chat-input" placeholder="Nachricht eingeben..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){{event.preventDefault();sendMessage()}}"></textarea>
-            <button class="btn btn-primary" onclick="sendMessage()">Senden →</button>
-        </div>
-    </div>
-    <script>
-    const chatMessages = document.getElementById('chat-messages');
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-    async function sendMessage() {{
-        const input = document.getElementById('chat-input');
-        const message = input.value.trim();
-        if (!message) return;
-        chatMessages.innerHTML += `<div class="chat-message user"><div class="chat-bubble">${{message}}</div></div>`;
-        input.value = '';
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-        const loadingId = 'loading-' + Date.now();
-        chatMessages.innerHTML += `<div class="chat-message assistant" id="${{loadingId}}"><div class="chat-bubble pulse">⏳ Claude denkt nach...</div></div>`;
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-        try {{
-            const res = await fetch('/api/ai/chat', {{ method: 'POST', headers: {{'Content-Type': 'application/json'}}, body: JSON.stringify({{ message }}) }});
-            const data = await res.json();
-            document.getElementById(loadingId).remove();
-            if (data.success) {{ chatMessages.innerHTML += `<div class="chat-message assistant"><div class="chat-bubble">${{data.response}}</div></div>`; }}
-            else {{ chatMessages.innerHTML += `<div class="chat-message assistant"><div class="chat-bubble" style="border:1px solid #ef4444">❌ ${{data.error}}</div></div>`; }}
-        }} catch (err) {{
-            document.getElementById(loadingId).remove();
-            chatMessages.innerHTML += `<div class="chat-message assistant"><div class="chat-bubble" style="border:1px solid #ef4444">❌ Verbindungsfehler</div></div>`;
-        }}
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-    }}
-    async function clearChat() {{ if (confirm('Chat leeren?')) {{ await fetch('/api/ai/clear', {{ method: 'POST' }}); location.reload(); }} }}
-    </script>'''
-    return Response(render_page('AI Chat', content, 'ai', user), mimetype='text/html')
-
-# =============================================================================
-# BROLY PAGE
-# =============================================================================
-@app.route('/dashboard/broly')
-@login_required
-def broly_page():
-    user = get_current_user()
-    automations = Automation.query.filter_by(user_id=user.id).all()
-    
-    auto_rows = ''
-    for a in automations:
-        status_badge = '<span class="badge badge-success">Aktiv</span>' if a.is_active else '<span class="badge badge-danger">Inaktiv</span>'
-        auto_rows += f'<tr><td><strong>{a.name}</strong></td><td>{a.trigger_type}</td><td>{a.action_type}</td><td>{a.run_count}</td><td>{status_badge}</td><td><button class="btn btn-sm btn-secondary" onclick="toggleAutomation({a.id})">⏯️</button></td></tr>'
-    
-    content = f'''
-    <div class="stats-grid">
-        <div class="stat-card" style="background:linear-gradient(135deg,rgba(239,68,68,0.2),rgba(220,38,38,0.2))"><div class="stat-value" style="color:#ef4444">∞</div><div class="stat-label">Power Level</div><div class="stat-change">LEGENDARY</div></div>
-        <div class="stat-card"><div class="stat-value">{len(automations)}</div><div class="stat-label">Automations</div></div>
-        <div class="stat-card"><div class="stat-value">{sum(a.run_count for a in automations)}</div><div class="stat-label">Ausführungen</div></div>
-        <div class="stat-card"><div class="stat-value">{len([a for a in automations if a.is_active])}</div><div class="stat-label">Aktiv</div></div>
-    </div>
-    <div class="grid-2">
-        <div class="card"><div class="card-header"><div class="card-title">💪 Broly Module</div></div>
-            <div class="grid-2" style="gap:1rem">
-                <div style="background:rgba(239,68,68,0.1);padding:1rem;border-radius:12px"><div style="font-size:1.5rem;margin-bottom:0.5rem">🔮</div><div style="font-weight:600">Majin Shield</div><div style="font-size:0.8rem;opacity:0.7">AES-256-GCM</div></div>
-                <div style="background:rgba(139,92,246,0.1);padding:1rem;border-radius:12px"><div style="font-size:1.5rem;margin-bottom:0.5rem">👁️</div><div style="font-weight:600">DEDSEC Detection</div><div style="font-size:0.8rem;opacity:0.7">24/7 Active</div></div>
-                <div style="background:rgba(34,197,94,0.1);padding:1rem;border-radius:12px"><div style="font-size:1.5rem;margin-bottom:0.5rem">🧠</div><div style="font-weight:600">Ultra Instinct AI</div><div style="font-size:0.8rem;opacity:0.7">99.4% Accuracy</div></div>
-                <div style="background:rgba(255,215,0,0.1);padding:1rem;border-radius:12px"><div style="font-size:1.5rem;margin-bottom:0.5rem">👑</div><div style="font-weight:600">GOD MODE</div><div style="font-size:0.8rem;opacity:0.7">Full Access</div></div>
-            </div>
-        </div>
-        <div class="card"><div class="card-header"><div class="card-title">👑 GOD MODE Commands</div></div>
-            <div style="display:flex;flex-direction:column;gap:0.75rem">
-                <button class="btn btn-secondary" onclick="godMode('SCAN_ALL')">🔍 Security Scan starten</button>
-                <button class="btn btn-secondary" onclick="godMode('OPTIMIZE')">⚡ System optimieren</button>
-                <button class="btn btn-secondary" onclick="godMode('SYNC_ALL')">🔄 Alle Daten synchronisieren</button>
-                <button class="btn btn-danger" onclick="godMode('ULTRA_INSTINCT')">🧠 Ultra Instinct aktivieren</button>
-            </div>
-        </div>
-    </div>
-    <div class="card"><div class="card-header"><div class="card-title">⚡ Automations</div><button class="btn btn-primary" onclick="openModal('auto-modal')">+ Neue Automation</button></div>
-        <div class="table-container"><table><thead><tr><th>Name</th><th>Trigger</th><th>Aktion</th><th>Runs</th><th>Status</th><th>Aktionen</th></tr></thead><tbody>{auto_rows if auto_rows else '<tr><td colspan="6" style="text-align:center;opacity:0.6">Keine Automations</td></tr>'}</tbody></table></div>
-    </div>
-    <div id="auto-modal" class="modal-overlay" onclick="if(event.target===this)closeModal('auto-modal')">
-        <div class="modal">
-            <div class="modal-header"><div class="modal-title">Neue Automation</div><button class="modal-close" onclick="closeModal('auto-modal')">&times;</button></div>
-            <form onsubmit="saveAutomation(event)">
-                <div class="form-group"><label class="form-label">Name</label><input type="text" name="name" class="form-input" required></div>
-                <div class="form-group"><label class="form-label">Trigger</label><select name="trigger_type" class="form-input"><option value="new_contact">Neuer Kontakt</option><option value="lead_won">Lead gewonnen</option><option value="message_received">Nachricht empfangen</option></select></div>
-                <div class="form-group"><label class="form-label">Aktion</label><select name="action_type" class="form-input"><option value="send_whatsapp">WhatsApp senden</option><option value="send_email">E-Mail senden</option><option value="create_task">Task erstellen</option><option value="award_tokens">Tokens vergeben</option></select></div>
-                <button type="submit" class="btn btn-primary" style="width:100%">💾 Speichern</button>
-            </form>
-        </div>
-    </div>
-    <script>
-    function openModal(id) {{ document.getElementById(id).classList.add('active'); }}
-    function closeModal(id) {{ document.getElementById(id).classList.remove('active'); }}
-    async function godMode(cmd) {{ alert('GOD MODE: ' + cmd + ' aktiviert!'); }}
-    async function saveAutomation(e) {{ e.preventDefault(); const f = e.target; await fetch('/api/automations', {{ method: 'POST', headers: {{'Content-Type': 'application/json'}}, body: JSON.stringify({{ name: f.name.value, trigger_type: f.trigger_type.value, action_type: f.action_type.value }}) }}); location.reload(); }}
-    async function toggleAutomation(id) {{ await fetch('/api/automations/' + id + '/toggle', {{ method: 'POST' }}); location.reload(); }}
-    </script>'''
-    return Response(render_page('Broly Taskforce', content, 'broly', user), mimetype='text/html')
-
-# =============================================================================
-# EINSTEIN PAGE
-# =============================================================================
-@app.route('/dashboard/einstein')
-@login_required
-def einstein_page():
-    user = get_current_user()
-    bots = [('🧠', 'Einstein', 'Architektur & Planung', 'genius'), ('🍎', 'Newton', 'Physik & Statik', 'active'), ('⚡', 'Tesla', 'Elektrik & Smart Home', 'active'), ('☢️', 'Curie', 'Chemie & Materialien', 'active'), ('🌌', 'Hawking', 'Kosmische Berechnungen', 'standby'), ('💻', 'Turing', 'KI & Algorithmen', 'active'), ('🎨', 'Da Vinci', 'Design & Kreativ', 'active'), ('🦎', 'Darwin', 'Evolution & Optimierung', 'standby')]
-    
-    bots_html = ''
-    for icon, name, specialty, status in bots:
-        if status == 'genius':
-            badge = '<span class="badge badge-purple">GENIUS</span>'
-        elif status == 'active':
-            badge = '<span class="badge badge-success">AKTIV</span>'
-        else:
-            badge = '<span class="badge badge-warning">STANDBY</span>'
-        bots_html += f'''<div class="card" style="cursor:pointer" onclick="activateBot('{name}')"><div style="display:flex;align-items:flex-start;gap:1rem"><div style="font-size:2.5rem">{icon}</div><div style="flex:1"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem"><div style="font-weight:600;font-size:1.1rem">{name} Bot</div>{badge}</div><div style="color:#667eea;font-size:0.85rem">{specialty}</div></div></div></div>'''
-    
-    task_count = Task.query.filter(Task.assigned_bot.isnot(None)).count()
-    content = f'''
-    <div class="stats-grid">
-        <div class="stat-card" style="background:linear-gradient(135deg,rgba(139,92,246,0.2),rgba(109,40,217,0.2))"><div class="stat-value">8</div><div class="stat-label">Genius Bots</div></div>
-        <div class="stat-card"><div class="stat-value">6</div><div class="stat-label">Aktive Bots</div></div>
-        <div class="stat-card"><div class="stat-value">{task_count}</div><div class="stat-label">Tasks</div></div>
-        <div class="stat-card"><div class="stat-value">99.4%</div><div class="stat-label">Accuracy</div></div>
-    </div>
-    <h2 style="margin-bottom:1.5rem">🧠 Bot Armee</h2>
-    <div class="grid-4">{bots_html}</div>
-    <script>function activateBot(name) {{ alert(name + ' Bot aktiviert!'); }}</script>'''
-    return Response(render_page('Einstein Agency', content, 'einstein', user), mimetype='text/html')
-
-# =============================================================================
-# DEDSEC PAGE
-# =============================================================================
-@app.route('/dashboard/dedsec')
-@login_required
-def dedsec_page():
-    user = get_current_user()
-    events = SecurityEvent.query.order_by(SecurityEvent.created_at.desc()).limit(20).all()
-    total = SecurityEvent.query.count()
-    resolved = SecurityEvent.query.filter_by(resolved=True).count()
-    high_sev = SecurityEvent.query.filter_by(severity='high', resolved=False).count()
-    score = max(0, min(100, 100 - high_sev * 10 - (total - resolved) * 2))
-    score_color = '#22c55e' if score >= 80 else '#f59e0b' if score >= 50 else '#ef4444'
-    
-    events_html = ''
-    for e in events:
-        date_str = e.created_at.strftime("%d.%m.%Y %H:%M") if e.created_at else "-"
-        if e.severity == 'high':
-            sev_badge = '<span class="badge badge-danger">HIGH</span>'
-        elif e.severity == 'medium':
-            sev_badge = '<span class="badge badge-warning">MEDIUM</span>'
-        else:
-            sev_badge = '<span class="badge badge-info">LOW</span>'
-        status = "✅" if e.resolved else "⏳"
-        events_html += f'<tr><td>{date_str}</td><td>{e.event_type}</td><td>{sev_badge}</td><td>{e.source or "-"}</td><td>{status}</td></tr>'
-    
-    content = f'''
-    <div class="stats-grid">
-        <div class="stat-card" style="background:linear-gradient(135deg,rgba(34,197,94,0.2),rgba(22,163,74,0.2));border-color:{score_color}"><div class="stat-value" style="color:{score_color}">{score}</div><div class="stat-label">Security Score</div></div>
-        <div class="stat-card"><div class="stat-value">{total}</div><div class="stat-label">Events gesamt</div></div>
-        <div class="stat-card"><div class="stat-value">{resolved}</div><div class="stat-label">Behoben</div></div>
-        <div class="stat-card"><div class="stat-value">{high_sev}</div><div class="stat-label">Kritisch offen</div></div>
-    </div>
-    <div class="grid-2">
-        <div class="card"><div class="card-header"><div class="card-title">🔐 Security Module</div></div>
-            <div style="display:flex;flex-direction:column;gap:1rem">
-                <div style="display:flex;justify-content:space-between;align-items:center;padding:1rem;background:rgba(34,197,94,0.1);border-radius:12px"><div style="display:flex;align-items:center;gap:1rem"><span style="font-size:1.5rem">🔥</span><div><div style="font-weight:600">Firewall</div></div></div><span class="badge badge-success">AKTIV</span></div>
-                <div style="display:flex;justify-content:space-between;align-items:center;padding:1rem;background:rgba(34,197,94,0.1);border-radius:12px"><div style="display:flex;align-items:center;gap:1rem"><span style="font-size:1.5rem">🔒</span><div><div style="font-weight:600">SSL/TLS</div></div></div><span class="badge badge-success">AKTIV</span></div>
-                <div style="display:flex;justify-content:space-between;align-items:center;padding:1rem;background:rgba(34,197,94,0.1);border-radius:12px"><div style="display:flex;align-items:center;gap:1rem"><span style="font-size:1.5rem">👁️</span><div><div style="font-weight:600">Monitoring</div></div></div><span class="badge badge-success">AKTIV</span></div>
-            </div>
-        </div>
-        <div class="card"><div class="card-header"><div class="card-title">⚡ Quick Actions</div></div>
-            <div style="display:flex;flex-direction:column;gap:0.75rem">
-                <button class="btn btn-secondary" onclick="alert('Security Scan gestartet')">🔍 Security Scan</button>
-                <button class="btn btn-secondary" onclick="alert('Logs werden geladen')">📋 Logs ansehen</button>
-                <button class="btn btn-danger" onclick="if(confirm('Lockdown aktivieren?'))alert('🚨 Lockdown Mode!')">🚨 Lockdown Mode</button>
-            </div>
-        </div>
-    </div>
-    <div class="card"><div class="card-header"><div class="card-title">📋 Security Events</div></div><div class="table-container"><table><thead><tr><th>Zeit</th><th>Event</th><th>Severity</th><th>Quelle</th><th>Status</th></tr></thead><tbody>{events_html if events_html else '<tr><td colspan="5" style="text-align:center;opacity:0.6">Keine Events</td></tr>'}</tbody></table></div></div>'''
-    return Response(render_page('DedSec Security', content, 'dedsec', user), mimetype='text/html')
-
-# =============================================================================
-# TOKENS PAGE
-# =============================================================================
-@app.route('/dashboard/tokens')
-@login_required
-def tokens_page():
-    user = get_current_user()
-    transactions = TokenTransaction.query.filter_by(user_id=user.id).order_by(TokenTransaction.created_at.desc()).limit(20).all()
-    
-    tx_html = ''
-    for tx in transactions:
-        date_str = tx.created_at.strftime("%d.%m.%Y %H:%M") if tx.created_at else "-"
-        if tx.token_type == 'god':
-            token_badge = '<span class="badge badge-warning">GOD</span>'
-        elif tx.token_type == 'dedsec':
-            token_badge = '<span class="badge badge-danger">DEDSEC</span>'
-        elif tx.token_type == 'og':
-            token_badge = '<span class="badge badge-purple">OG</span>'
-        else:
-            token_badge = '<span class="badge badge-info">TOWER</span>'
-        amount_color = "#22c55e" if tx.amount > 0 else "#ef4444"
-        amount_sign = "+" if tx.amount > 0 else ""
-        tx_html += f'<tr><td>{date_str}</td><td>{token_badge}</td><td style="color:{amount_color};font-weight:600">{amount_sign}{tx.amount}</td><td>{tx.action}</td><td>{tx.description}</td></tr>'
-    
-    content = f'''
-    <div class="stats-grid">
-        <div class="stat-card" style="background:linear-gradient(135deg,rgba(255,215,0,0.2),rgba(255,140,0,0.2))"><div class="stat-value" style="color:#ffd700">{user.tokens_god}</div><div class="stat-label">🪙 GOD Tokens</div></div>
-        <div class="stat-card" style="background:linear-gradient(135deg,rgba(239,68,68,0.2),rgba(220,38,38,0.2))"><div class="stat-value" style="color:#ef4444">{user.tokens_dedsec}</div><div class="stat-label">🔐 DEDSEC Tokens</div></div>
-        <div class="stat-card" style="background:linear-gradient(135deg,rgba(139,92,246,0.2),rgba(109,40,217,0.2))"><div class="stat-value" style="color:#8b5cf6">{user.tokens_og}</div><div class="stat-label">🟣 OG Tokens</div></div>
-        <div class="stat-card" style="background:linear-gradient(135deg,rgba(59,130,246,0.2),rgba(37,99,235,0.2))"><div class="stat-value" style="color:#3b82f6">{user.tokens_tower}</div><div class="stat-label">🏗️ TOWER Tokens</div></div>
-    </div>
-    <div class="grid-2">
-        <div class="card"><div class="card-header"><div class="card-title">🎁 Tokens verdienen</div></div>
-            <div style="display:flex;flex-direction:column;gap:1rem">
-                <div style="display:flex;justify-content:space-between;padding:1rem;background:rgba(255,255,255,0.03);border-radius:12px"><div><div style="font-weight:500">Kontakt erstellen</div></div><span style="color:#ffd700;font-weight:600">+5 GOD</span></div>
-                <div style="display:flex;justify-content:space-between;padding:1rem;background:rgba(255,255,255,0.03);border-radius:12px"><div><div style="font-weight:500">Lead gewinnen</div></div><span style="color:#ffd700;font-weight:600">+50 GOD</span></div>
-                <div style="display:flex;justify-content:space-between;padding:1rem;background:rgba(255,255,255,0.03);border-radius:12px"><div><div style="font-weight:500">Security Scan</div></div><span style="color:#ef4444;font-weight:600">+10 DEDSEC</span></div>
-                <div style="display:flex;justify-content:space-between;padding:1rem;background:rgba(255,255,255,0.03);border-radius:12px"><div><div style="font-weight:500">Täglicher Login</div></div><span style="color:#3b82f6;font-weight:600">+1 TOWER</span></div>
-            </div>
-        </div>
-        <div class="card"><div class="card-header"><div class="card-title">🛒 Token Shop</div></div>
-            <div style="display:flex;flex-direction:column;gap:1rem">
-                <div style="display:flex;justify-content:space-between;align-items:center;padding:1rem;background:rgba(255,215,0,0.1);border-radius:12px"><div><div style="font-weight:500">Premium Badge</div></div><button class="btn btn-sm btn-primary">100 GOD</button></div>
-                <div style="display:flex;justify-content:space-between;align-items:center;padding:1rem;background:rgba(139,92,246,0.1);border-radius:12px"><div><div style="font-weight:500">Extra Kontakte</div></div><button class="btn btn-sm btn-primary">250 GOD</button></div>
-                <div style="display:flex;justify-content:space-between;align-items:center;padding:1rem;background:rgba(239,68,68,0.1);border-radius:12px"><div><div style="font-weight:500">DedSec Shield</div></div><button class="btn btn-sm btn-danger">500 DEDSEC</button></div>
-            </div>
-        </div>
-    </div>
-    <div class="card"><div class="card-header"><div class="card-title">📜 Transaktionen</div></div><div class="table-container"><table><thead><tr><th>Datum</th><th>Token</th><th>Betrag</th><th>Aktion</th><th>Beschreibung</th></tr></thead><tbody>{tx_html if tx_html else '<tr><td colspan="5" style="text-align:center;opacity:0.6">Keine Transaktionen</td></tr>'}</tbody></table></div></div>'''
-    return Response(render_page('Token Economy', content, 'tokens', user), mimetype='text/html')
-# =============================================================================
-# GENERIC DASHBOARD SUB-PAGES
-# =============================================================================
-@app.route('/dashboard/<page>')
-@login_required
-def dashboard_subpage(page):
-    user = get_current_user()
-    pages_config = {
-        'whatsapp': ('📱 WhatsApp Business', 'whatsapp', generate_whatsapp_content),
-        'messages': ('💬 Nachrichten', 'messages', generate_messages_content),
-        'campaigns': ('📧 Kampagnen', 'campaigns', generate_campaigns_content),
-        'invoices': ('📄 Rechnungen', 'invoices', generate_invoices_content),
-        'loxone': ('🏠 LOXONE Smart Home', 'loxone', generate_loxone_content),
-        'automations': ('⚡ Z Automations', 'automations', generate_automations_content),
-        'settings': ('⚙️ Einstellungen', 'settings', generate_settings_content),
-    }
-    if page not in pages_config:
-        return redirect('/dashboard')
-    title, active, content_func = pages_config[page]
-    content = content_func(user)
-    return Response(render_page(title, content, active, user), mimetype='text/html')
-
-def generate_whatsapp_content(user):
-    consent_count = Contact.query.filter_by(whatsapp_consent=True).count()
-    return f'''
-    <div class="stats-grid">
-        <div class="stat-card"><div class="stat-value">{consent_count}</div><div class="stat-label">Kontakte mit Consent</div></div>
-        <div class="stat-card"><div class="stat-value">{Message.query.filter_by(channel='whatsapp').count()}</div><div class="stat-label">Nachrichten</div></div>
-        <div class="stat-card"><div class="stat-value">98%</div><div class="stat-label">Zustellrate</div></div>
-        <div class="stat-card"><div class="stat-value">45%</div><div class="stat-label">Öffnungsrate</div></div>
-    </div>
-    <div class="grid-2">
-        <div class="card"><div class="card-header"><div class="card-title">📤 Nachricht senden</div></div>
-            <form onsubmit="sendWhatsApp(event)">
-                <div class="form-group"><label class="form-label">Empfänger (Telefon)</label><input type="tel" name="phone" class="form-input" placeholder="+49170..." required></div>
-                <div class="form-group"><label class="form-label">Nachricht</label><textarea name="message" class="form-input" rows="4" required></textarea></div>
-                <button type="submit" class="btn btn-success" style="width:100%">📱 Senden</button>
-            </form>
-        </div>
-        <div class="card"><div class="card-header"><div class="card-title">📋 Templates</div></div>
-            <div style="display:flex;flex-direction:column;gap:0.75rem">
-                <div style="padding:1rem;background:rgba(255,255,255,0.03);border-radius:10px;cursor:pointer"><div style="font-weight:500">👋 Willkommen</div><div style="font-size:0.8rem;opacity:0.6">Begrüßungsnachricht</div></div>
-                <div style="padding:1rem;background:rgba(255,255,255,0.03);border-radius:10px;cursor:pointer"><div style="font-weight:500">📞 Follow-Up</div><div style="font-size:0.8rem;opacity:0.6">Nachfass-Nachricht</div></div>
-                <div style="padding:1rem;background:rgba(255,255,255,0.03);border-radius:10px;cursor:pointer"><div style="font-weight:500">💰 Angebot</div><div style="font-size:0.8rem;opacity:0.6">Angebots-Nachricht</div></div>
-            </div>
-        </div>
-    </div>
-    <script>async function sendWhatsApp(e) {{ e.preventDefault(); alert('📱 WhatsApp wird gesendet...'); }}</script>'''
-
-def generate_messages_content(user):
-    return '''<div class="card"><div class="empty-state"><div class="empty-icon">💬</div><div class="empty-title">Nachrichten</div><div class="empty-text">Inbox wird bald verfügbar!</div></div></div>'''
-
-def generate_campaigns_content(user):
-    campaigns = Campaign.query.order_by(Campaign.created_at.desc()).limit(10).all()
-    rows = ''.join([f'<tr><td><strong>{c.name}</strong></td><td>{c.type}</td><td><span class="badge badge-{"success" if c.status == "sent" else "warning" if c.status == "scheduled" else "info"}">{c.status}</span></td><td>{c.sent_count}</td><td>{c.open_count}</td></tr>' for c in campaigns])
-    return f'''
-    <div class="card">
-        <div class="card-header"><div class="card-title">📧 Kampagnen</div><button class="btn btn-primary" onclick="openModal('campaign-modal')">+ Neue Kampagne</button></div>
-        <div class="table-container"><table><thead><tr><th>Name</th><th>Typ</th><th>Status</th><th>Gesendet</th><th>Geöffnet</th></tr></thead><tbody>{rows if rows else '<tr><td colspan="5" style="text-align:center;opacity:0.6">Keine Kampagnen</td></tr>'}</tbody></table></div>
-    </div>
-    <div id="campaign-modal" class="modal-overlay" onclick="if(event.target===this)closeModal('campaign-modal')">
-        <div class="modal">
-            <div class="modal-header"><div class="modal-title">Neue Kampagne</div><button class="modal-close" onclick="closeModal('campaign-modal')">&times;</button></div>
-            <form onsubmit="saveCampaign(event)">
-                <div class="form-group"><label class="form-label">Name</label><input type="text" name="name" class="form-input" required></div>
-                <div class="form-group"><label class="form-label">Typ</label><select name="type" class="form-input"><option value="whatsapp">WhatsApp</option><option value="email">E-Mail</option></select></div>
-                <div class="form-group"><label class="form-label">Nachricht</label><textarea name="template" class="form-input" rows="4"></textarea></div>
-                <button type="submit" class="btn btn-primary" style="width:100%">💾 Speichern</button>
-            </form>
-        </div>
-    </div>
-    <script>
-    function openModal(id) {{ document.getElementById(id).classList.add('active'); }}
-    function closeModal(id) {{ document.getElementById(id).classList.remove('active'); }}
-    async function saveCampaign(e) {{ e.preventDefault(); const f = e.target; await fetch('/api/campaigns', {{ method: 'POST', headers: {{'Content-Type': 'application/json'}}, body: JSON.stringify({{ name: f.name.value, type: f.type.value, template: f.template.value }}) }}); location.reload(); }}
-    </script>'''
-
-def generate_invoices_content(user):
-    invoices = Invoice.query.order_by(Invoice.created_at.desc()).limit(20).all()
-    rows = ''.join([f'<tr><td><strong>{inv.invoice_number}</strong></td><td>{inv.contact_name or "-"}</td><td>€{inv.total:,.2f}</td><td>{inv.created_at.strftime("%d.%m.%Y") if inv.created_at else "-"}</td><td><span class="badge badge-{"success" if inv.status == "paid" else "warning" if inv.status == "sent" else "danger" if inv.status == "overdue" else "info"}">{inv.status}</span></td></tr>' for inv in invoices])
-    return f'''
-    <div class="stats-grid">
-        <div class="stat-card"><div class="stat-value">€{sum(i.total for i in invoices if i.status == "paid"):,.0f}</div><div class="stat-label">Umsatz (bezahlt)</div></div>
-        <div class="stat-card"><div class="stat-value">€{sum(i.total for i in invoices if i.status in ["sent", "overdue"]):,.0f}</div><div class="stat-label">Offene Rechnungen</div></div>
-        <div class="stat-card"><div class="stat-value">{len(invoices)}</div><div class="stat-label">Rechnungen gesamt</div></div>
-    </div>
-    <div class="card">
-        <div class="card-header"><div class="card-title">📄 Rechnungen</div><button class="btn btn-primary" onclick="openModal('invoice-modal')">+ Neue Rechnung</button></div>
-        <div class="table-container"><table><thead><tr><th>Nr.</th><th>Kunde</th><th>Betrag</th><th>Datum</th><th>Status</th></tr></thead><tbody>{rows if rows else '<tr><td colspan="5" style="text-align:center;opacity:0.6">Keine Rechnungen</td></tr>'}</tbody></table></div>
-    </div>
-    <div id="invoice-modal" class="modal-overlay" onclick="if(event.target===this)closeModal('invoice-modal')">
-        <div class="modal">
-            <div class="modal-header"><div class="modal-title">Neue Rechnung</div><button class="modal-close" onclick="closeModal('invoice-modal')">&times;</button></div>
-            <form onsubmit="saveInvoice(event)">
-                <div class="form-group"><label class="form-label">Kunde</label><input type="text" name="contact_name" class="form-input" required></div>
-                <div class="form-group"><label class="form-label">E-Mail</label><input type="email" name="contact_email" class="form-input"></div>
-                <div class="form-group"><label class="form-label">Betrag (€)</label><input type="number" name="total" class="form-input" step="0.01" required></div>
-                <button type="submit" class="btn btn-primary" style="width:100%">💾 Erstellen</button>
-            </form>
-        </div>
-    </div>
-    <script>
-    function openModal(id) {{ document.getElementById(id).classList.add('active'); }}
-    function closeModal(id) {{ document.getElementById(id).classList.remove('active'); }}
-    async function saveInvoice(e) {{ e.preventDefault(); const f = e.target; await fetch('/api/invoices', {{ method: 'POST', headers: {{'Content-Type': 'application/json'}}, body: JSON.stringify({{ contact_name: f.contact_name.value, contact_email: f.contact_email.value, total: parseFloat(f.total.value) }}) }}); location.reload(); }}
-    </script>'''
-
-def generate_loxone_content(user):
-    return '''
-    <div class="stats-grid">
-        <div class="stat-card" style="background:linear-gradient(135deg,rgba(34,197,94,0.2),rgba(22,163,74,0.2))"><div class="stat-value" style="color:#22c55e">12</div><div class="stat-label">Geräte verbunden</div></div>
-        <div class="stat-card"><div class="stat-value">4</div><div class="stat-label">Räume</div></div>
-        <div class="stat-card"><div class="stat-value">22°C</div><div class="stat-label">Durchschn. Temp</div></div>
-        <div class="stat-card"><div class="stat-value">45%</div><div class="stat-label">Energie gespart</div></div>
-    </div>
-    <div class="grid-2">
-        <div class="card"><div class="card-header"><div class="card-title">🏠 Räume</div></div>
-            <div style="display:flex;flex-direction:column;gap:0.75rem">
-                <div style="display:flex;justify-content:space-between;align-items:center;padding:1rem;background:rgba(255,255,255,0.03);border-radius:10px"><div style="display:flex;align-items:center;gap:1rem"><span style="font-size:1.5rem">🛋️</span><div><div style="font-weight:500">Wohnzimmer</div><div style="font-size:0.8rem;opacity:0.6">22°C • Licht 80%</div></div></div><span class="badge badge-success">Komfort</span></div>
-                <div style="display:flex;justify-content:space-between;align-items:center;padding:1rem;background:rgba(255,255,255,0.03);border-radius:10px"><div style="display:flex;align-items:center;gap:1rem"><span style="font-size:1.5rem">🛏️</span><div><div style="font-weight:500">Schlafzimmer</div><div style="font-size:0.8rem;opacity:0.6">19°C • Licht Aus</div></div></div><span class="badge badge-info">Nacht</span></div>
-                <div style="display:flex;justify-content:space-between;align-items:center;padding:1rem;background:rgba(255,255,255,0.03);border-radius:10px"><div style="display:flex;align-items:center;gap:1rem"><span style="font-size:1.5rem">🍳</span><div><div style="font-weight:500">Küche</div><div style="font-size:0.8rem;opacity:0.6">21°C • Licht 100%</div></div></div><span class="badge badge-success">Aktiv</span></div>
-                <div style="display:flex;justify-content:space-between;align-items:center;padding:1rem;background:rgba(255,255,255,0.03);border-radius:10px"><div style="display:flex;align-items:center;gap:1rem"><span style="font-size:1.5rem">💼</span><div><div style="font-weight:500">Büro</div><div style="font-size:0.8rem;opacity:0.6">23°C • Licht 70%</div></div></div><span class="badge badge-purple">Fokus</span></div>
-            </div>
-        </div>
-        <div class="card"><div class="card-header"><div class="card-title">🎬 Szenen</div></div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
-                <button class="btn btn-secondary" onclick="alert('Morgen aktiviert!')" style="padding:1.5rem;flex-direction:column;height:auto"><span style="font-size:2rem;margin-bottom:0.5rem">🌅</span><span>Morgen</span></button>
-                <button class="btn btn-secondary" onclick="alert('Arbeit aktiviert!')" style="padding:1.5rem;flex-direction:column;height:auto"><span style="font-size:2rem;margin-bottom:0.5rem">💼</span><span>Arbeit</span></button>
-                <button class="btn btn-secondary" onclick="alert('Entspannen aktiviert!')" style="padding:1.5rem;flex-direction:column;height:auto"><span style="font-size:2rem;margin-bottom:0.5rem">🌙</span><span>Entspannen</span></button>
-                <button class="btn btn-secondary" onclick="alert('Abwesend aktiviert!')" style="padding:1.5rem;flex-direction:column;height:auto"><span style="font-size:2rem;margin-bottom:0.5rem">🏃</span><span>Abwesend</span></button>
-            </div>
-        </div>
-    </div>
-    <div class="card"><div class="card-header"><div class="card-title">⚡ Energieverbrauch</div></div>
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:2rem;background:linear-gradient(135deg,rgba(34,197,94,0.1),rgba(22,163,74,0.1));border-radius:12px">
-            <div><div style="font-size:3rem;font-weight:700;color:#22c55e">2.4 kWh</div><div style="opacity:0.7">Heute verbraucht</div></div>
-            <div style="text-align:right"><div style="color:#22c55e;font-size:1.25rem;font-weight:600">↓ 15%</div><div style="opacity:0.7;font-size:0.9rem">vs. gestern</div></div>
-        </div>
-    </div>'''
-
-def generate_automations_content(user):
-    return '''<div class="card"><div class="empty-state"><div class="empty-icon">⚡</div><div class="empty-title">Z Automations</div><div class="empty-text">Workflow Engine wird bald verfügbar!</div><a href="/dashboard/broly" class="btn btn-primary">Broly Taskforce nutzen</a></div></div>'''
-
-def generate_settings_content(user):
-    return f'''
-    <div class="grid-2">
-        <div class="card"><div class="card-header"><div class="card-title">👤 Profil</div></div>
-            <form onsubmit="saveProfile(event)">
-                <div class="form-group"><label class="form-label">Name</label><input type="text" name="name" class="form-input" value="{user.name or ''}"></div>
-                <div class="form-group"><label class="form-label">E-Mail</label><input type="email" name="email" class="form-input" value="{user.email}"></div>
-                <div class="form-group"><label class="form-label">Neues Passwort</label><input type="password" name="password" class="form-input" placeholder="Leer lassen um nicht zu ändern"></div>
-                <button type="submit" class="btn btn-primary">💾 Speichern</button>
-            </form>
-        </div>
-        <div class="card"><div class="card-header"><div class="card-title">📊 Plan</div></div>
-            <div style="padding:1.5rem;background:linear-gradient(135deg,rgba(102,126,234,0.2),rgba(118,75,162,0.2));border-radius:12px;margin-bottom:1rem"><div style="font-size:0.8rem;opacity:0.6;margin-bottom:0.25rem">Aktueller Plan</div><div style="font-size:1.5rem;font-weight:700">{user.plan.upper()}</div></div>
-            <a href="#" class="btn btn-primary" style="width:100%">⬆️ Plan upgraden</a>
-        </div>
-    </div>
-    <div class="card"><div class="card-header"><div class="card-title">🔑 API Konfiguration</div></div>
-        <div style="display:flex;flex-direction:column;gap:1rem">
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:1rem;background:rgba(255,255,255,0.03);border-radius:10px"><div style="display:flex;align-items:center;gap:1rem"><span style="font-size:1.5rem">🤖</span><div><div style="font-weight:500">Claude AI</div></div></div><span class="badge badge-success">✓ Konfiguriert</span></div>
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:1rem;background:rgba(255,255,255,0.03);border-radius:10px"><div style="display:flex;align-items:center;gap:1rem"><span style="font-size:1.5rem">📱</span><div><div style="font-weight:500">WhatsApp Business</div></div></div><span class="badge badge-warning">⏳ Pending</span></div>
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:1rem;background:rgba(255,255,255,0.03);border-radius:10px"><div style="display:flex;align-items:center;gap:1rem"><span style="font-size:1.5rem">💳</span><div><div style="font-weight:500">Stripe</div></div></div><span class="badge badge-warning">⏳ Pending</span></div>
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:1rem;background:rgba(255,255,255,0.03);border-radius:10px"><div style="display:flex;align-items:center;gap:1rem"><span style="font-size:1.5rem">🏠</span><div><div style="font-weight:500">LOXONE</div></div></div><span class="badge badge-warning">⏳ Pending</span></div>
-        </div>
-    </div>
-    <script>async function saveProfile(e) {{ e.preventDefault(); const f = e.target; await fetch('/api/user/profile', {{ method: 'POST', headers: {{'Content-Type': 'application/json'}}, body: JSON.stringify({{ name: f.name.value, email: f.email.value, password: f.password.value }}) }}); alert('Profil gespeichert!'); }}</script>'''
-
-# =============================================================================
-# WIKI PAGE
-# =============================================================================
-@app.route('/wiki')
-def wiki_page():
-    return Response(render_page('Wiki', '''
-    <div class="card"><div class="card-header"><div class="card-title">📚 West Money OS Dokumentation</div></div>
-        <div style="display:flex;flex-direction:column;gap:1rem">
-            <div style="padding:1.5rem;background:rgba(255,255,255,0.03);border-radius:12px"><h3 style="margin-bottom:0.5rem">🚀 Getting Started</h3><p style="opacity:0.7">Lerne die Grundlagen von West Money OS und starte durch.</p></div>
-            <div style="padding:1.5rem;background:rgba(255,255,255,0.03);border-radius:12px"><h3 style="margin-bottom:0.5rem">👥 CRM Module</h3><p style="opacity:0.7">Kontakte, Leads und Kampagnen verwalten.</p></div>
-            <div style="padding:1.5rem;background:rgba(255,255,255,0.03);border-radius:12px"><h3 style="margin-bottom:0.5rem">💪 Power Modules</h3><p style="opacity:0.7">Broly, Einstein, DedSec und Token Economy.</p></div>
-            <div style="padding:1.5rem;background:rgba(255,255,255,0.03);border-radius:12px"><h3 style="margin-bottom:0.5rem">🔌 API Integration</h3><p style="opacity:0.7">WhatsApp, Stripe, LOXONE und mehr.</p></div>
-        </div>
-    </div>''', '', get_current_user() if 'user_id' in session else User(username='Guest', tokens_god=0, tokens_dedsec=0)), mimetype='text/html')
-# =============================================================================
-# LEGAL PAGES - DSGVO COMPLIANCE
-# =============================================================================
-
-LEGAL_STYLES = '''
-<style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Inter', sans-serif; background: #0a0a12; color: #fff; line-height: 1.8; }
-    .legal-nav { padding: 1rem 5%; background: rgba(0,0,0,0.5); display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; backdrop-filter: blur(10px); z-index: 100; }
-    .legal-nav a { color: #fff; text-decoration: none; }
-    .legal-nav .logo { font-weight: 700; font-size: 1.25rem; }
-    .legal-content { max-width: 900px; margin: 0 auto; padding: 3rem 2rem; }
-    .legal-content h1 { font-size: 2.5rem; margin-bottom: 0.5rem; background: linear-gradient(135deg, #667eea, #764ba2); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-    .legal-content .updated { opacity: 0.6; margin-bottom: 3rem; }
-    .legal-content h2 { font-size: 1.5rem; margin: 2.5rem 0 1rem; color: #667eea; }
-    .legal-content h3 { font-size: 1.2rem; margin: 2rem 0 0.75rem; }
-    .legal-content p { margin-bottom: 1rem; opacity: 0.9; }
-    .legal-content ul, .legal-content ol { margin: 1rem 0 1rem 2rem; }
-    .legal-content li { margin-bottom: 0.5rem; }
-    .legal-content a { color: #667eea; }
-    .legal-content .highlight { background: rgba(102,126,234,0.1); border-left: 4px solid #667eea; padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 10px 10px 0; }
-    .legal-content table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
-    .legal-content th, .legal-content td { padding: 1rem; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.1); }
-    .legal-content th { background: rgba(102,126,234,0.1); }
-    .legal-footer { padding: 2rem 5%; border-top: 1px solid rgba(255,255,255,0.1); text-align: center; opacity: 0.6; }
-    .legal-links { display: flex; gap: 2rem; justify-content: center; margin-bottom: 1rem; }
-    .legal-links a { color: #667eea; text-decoration: none; }
-</style>
-'''
-
-def legal_page_wrapper(title, content):
-    return f'''<!DOCTYPE html>
-<html lang="de">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{title} - West Money OS | Enterprise Universe GmbH</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    {LEGAL_STYLES}
-</head>
-<body>
-    <nav class="legal-nav">
-        <a href="/" class="logo">💰 West Money OS</a>
-        <div style="display:flex;gap:2rem">
-            <a href="/impressum">Impressum</a>
-            <a href="/datenschutz">Datenschutz</a>
-            <a href="/agb">AGB</a>
-            <a href="/login">Login</a>
-        </div>
-    </nav>
-    <main class="legal-content">{content}</main>
-    <footer class="legal-footer">
-        <div class="legal-links">
-            <a href="/impressum">Impressum</a>
-            <a href="/datenschutz">Datenschutz</a>
-            <a href="/agb">AGB</a>
-            <a href="/widerruf">Widerrufsrecht</a>
-        </div>
-        <p>© 2025 Enterprise Universe GmbH. Alle Rechte vorbehalten.</p>
-    </footer>
-</body>
-</html>'''
-
-@app.route('/impressum')
-def impressum():
-    content = '''
-    <h1>Impressum</h1>
-    <p class="updated">Stand: Dezember 2025</p>
-    
-    <h2>Angaben gemäß § 5 TMG</h2>
-    <p><strong>Enterprise Universe GmbH</strong><br>
-    Geschäftsführer: Ömer Hüseyin Coşkun<br>
-    [Geschäftsadresse einfügen]<br>
-    [PLZ Stadt], Deutschland</p>
-    
-    <h2>Kontakt</h2>
-    <p>E-Mail: info@enterprise-universe.de<br>
-    Telefon: [Telefonnummer einfügen]<br>
-    Website: www.west-money.com</p>
-    
-    <h2>Registereintrag</h2>
-    <p>Handelsregister: [Amtsgericht]<br>
-    Registernummer: HRB [Nummer]<br>
-    USt-IdNr.: DE[Nummer]</p>
-    
-    <h2>Verantwortlich für den Inhalt nach § 55 Abs. 2 RStV</h2>
-    <p>Ömer Hüseyin Coşkun<br>
-    [Adresse wie oben]</p>
-    
-    <h2>Zugehörige Unternehmen</h2>
-    <ul>
-        <li><strong>West Money Bau</strong> - Smart Home Konstruktion & LOXONE Integration</li>
-        <li><strong>Z Automation</strong> - Gebäudeautomation</li>
-        <li><strong>DedSec World AI</strong> - AR/VR Security Systeme</li>
-    </ul>
-    
-    <h2>EU-Streitschlichtung</h2>
-    <p>Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit: 
-    <a href="https://ec.europa.eu/consumers/odr/" target="_blank">https://ec.europa.eu/consumers/odr/</a></p>
-    <p>Unsere E-Mail-Adresse finden Sie oben im Impressum.</p>
-    
-    <h2>Verbraucherstreitbeilegung/Universalschlichtungsstelle</h2>
-    <p>Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer 
-    Verbraucherschlichtungsstelle teilzunehmen.</p>
-    
-    <h2>Haftung für Inhalte</h2>
-    <p>Als Diensteanbieter sind wir gemäß § 7 Abs.1 TMG für eigene Inhalte auf diesen Seiten nach den 
-    allgemeinen Gesetzen verantwortlich. Nach §§ 8 bis 10 TMG sind wir als Diensteanbieter jedoch nicht 
-    verpflichtet, übermittelte oder gespeicherte fremde Informationen zu überwachen oder nach Umständen 
-    zu forschen, die auf eine rechtswidrige Tätigkeit hinweisen.</p>
-    
-    <h2>Haftung für Links</h2>
-    <p>Unser Angebot enthält Links zu externen Websites Dritter, auf deren Inhalte wir keinen Einfluss haben. 
-    Deshalb können wir für diese fremden Inhalte auch keine Gewähr übernehmen. Für die Inhalte der verlinkten 
-    Seiten ist stets der jeweilige Anbieter oder Betreiber der Seiten verantwortlich.</p>
-    
-    <h2>Urheberrecht</h2>
-    <p>Die durch die Seitenbetreiber erstellten Inhalte und Werke auf diesen Seiten unterliegen dem deutschen 
-    Urheberrecht. Die Vervielfältigung, Bearbeitung, Verbreitung und jede Art der Verwertung außerhalb der 
-    Grenzen des Urheberrechtes bedürfen der schriftlichen Zustimmung des jeweiligen Autors bzw. Erstellers.</p>
+    {% endblock %}
     '''
-    return Response(legal_page_wrapper('Impressum', content), mimetype='text/html')
+    return render_template_string(BASE_TEMPLATE + content, 
+                                  title="Leads", 
+                                  active_page="leads",
+                                  leads=LEADS_DATA)
 
-@app.route('/datenschutz')
-def datenschutz():
+# ============================================================================
+# ROUTES - EINSTEIN AI
+# ============================================================================
+@app.route('/einstein')
+@login_required
+def einstein():
     content = '''
-    <h1>Datenschutzerklärung</h1>
-    <p class="updated">Stand: Dezember 2025 | DSGVO-konform</p>
-    
-    <div class="highlight">
-        <strong>Kurzübersicht:</strong> Wir nehmen den Schutz Ihrer persönlichen Daten sehr ernst. 
-        Diese Datenschutzerklärung informiert Sie über Art, Umfang und Zweck der Verarbeitung 
-        personenbezogener Daten auf unserer Plattform West Money OS.
-    </div>
-    
-    <h2>1. Verantwortlicher</h2>
-    <p><strong>Enterprise Universe GmbH</strong><br>
-    Geschäftsführer: Ömer Hüseyin Coşkun<br>
-    E-Mail: datenschutz@enterprise-universe.de</p>
-    
-    <h2>2. Erhebung und Speicherung personenbezogener Daten</h2>
-    <h3>2.1 Beim Besuch der Website</h3>
-    <p>Beim Aufrufen unserer Website werden automatisch Informationen an den Server übermittelt:</p>
-    <ul>
-        <li>IP-Adresse des anfragenden Rechners</li>
-        <li>Datum und Uhrzeit des Zugriffs</li>
-        <li>Name und URL der abgerufenen Datei</li>
-        <li>Website, von der aus der Zugriff erfolgt (Referrer-URL)</li>
-        <li>Verwendeter Browser und ggf. das Betriebssystem</li>
-    </ul>
-    <p><strong>Rechtsgrundlage:</strong> Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse)</p>
-    
-    <h3>2.2 Bei Registrierung und Nutzung</h3>
-    <p>Bei der Registrierung erheben wir:</p>
-    <ul>
-        <li>Name, Vorname</li>
-        <li>E-Mail-Adresse</li>
-        <li>Telefonnummer (optional)</li>
-        <li>Unternehmensdaten (optional)</li>
-        <li>Passwort (verschlüsselt gespeichert)</li>
-    </ul>
-    <p><strong>Rechtsgrundlage:</strong> Art. 6 Abs. 1 lit. b DSGVO (Vertragserfüllung)</p>
-    
-    <h2>3. WhatsApp Business Integration</h2>
-    <div class="highlight">
-        <strong>Wichtig:</strong> Die Nutzung der WhatsApp Business API erfordert Ihre ausdrückliche Einwilligung.
-    </div>
-    <h3>3.1 Einwilligung (Consent)</h3>
-    <p>Bevor wir Sie über WhatsApp kontaktieren können, müssen Sie aktiv einwilligen. Diese Einwilligung:</p>
-    <ul>
-        <li>Wird separat für jeden Kontakt erfasst</li>
-        <li>Kann jederzeit widerrufen werden</li>
-        <li>Wird mit Zeitstempel dokumentiert</li>
-    </ul>
-    <h3>3.2 Verarbeitete Daten</h3>
-    <ul>
-        <li>Telefonnummer</li>
-        <li>Nachrichteninhalt</li>
-        <li>Zustellstatus</li>
-        <li>Zeitstempel</li>
-    </ul>
-    <p><strong>Rechtsgrundlage:</strong> Art. 6 Abs. 1 lit. a DSGVO (Einwilligung)</p>
-    <h3>3.3 Bulk-Consent-Management</h3>
-    <p>Sie können den WhatsApp-Consent-Status mehrerer Kontakte gleichzeitig bearbeiten. 
-    Weitere Informationen: <a href="https://knowledge.hubspot.com/de/inbox/edit-the-whatsapp-consent-status-of-your-contacts-in-bulk" target="_blank">HubSpot WhatsApp Consent Guide</a></p>
-    
-    <h2>4. CRM-Datenverarbeitung</h2>
-    <p>Im Rahmen unseres CRM-Systems verarbeiten wir:</p>
-    <table>
-        <tr><th>Datenkategorie</th><th>Zweck</th><th>Speicherdauer</th></tr>
-        <tr><td>Kontaktdaten</td><td>Kundenbeziehungsmanagement</td><td>Bis Löschungsanfrage</td></tr>
-        <tr><td>Lead-Informationen</td><td>Vertriebsprozesse</td><td>3 Jahre nach Inaktivität</td></tr>
-        <tr><td>Kommunikationshistorie</td><td>Serviceverbesserung</td><td>2 Jahre</td></tr>
-        <tr><td>Rechnungsdaten</td><td>Buchführung</td><td>10 Jahre (gesetzlich)</td></tr>
-    </table>
-    
-    <h2>5. Cookies und Tracking</h2>
-    <h3>5.1 Technisch notwendige Cookies</h3>
-    <p>Wir verwenden Session-Cookies für die Authentifizierung. Diese sind für den Betrieb erforderlich.</p>
-    <h3>5.2 Optionale Cookies</h3>
-    <p>Analyse-Cookies werden nur mit Ihrer ausdrücklichen Einwilligung gesetzt.</p>
-    
-    <h2>6. Ihre Rechte (DSGVO Art. 15-22)</h2>
-    <ul>
-        <li><strong>Auskunft (Art. 15):</strong> Sie können Auskunft über Ihre gespeicherten Daten verlangen</li>
-        <li><strong>Berichtigung (Art. 16):</strong> Sie können unrichtige Daten korrigieren lassen</li>
-        <li><strong>Löschung (Art. 17):</strong> Sie können die Löschung Ihrer Daten verlangen</li>
-        <li><strong>Einschränkung (Art. 18):</strong> Sie können die Verarbeitung einschränken lassen</li>
-        <li><strong>Datenübertragbarkeit (Art. 20):</strong> Sie können Ihre Daten in einem gängigen Format erhalten</li>
-        <li><strong>Widerspruch (Art. 21):</strong> Sie können der Verarbeitung widersprechen</li>
-    </ul>
-    
-    <div class="highlight">
-        <strong>Anfragen:</strong> Senden Sie Ihre Datenschutzanfragen an: datenschutz@enterprise-universe.de
-    </div>
-    
-    <h2>7. Datensicherheit</h2>
-    <p>Wir setzen technische und organisatorische Sicherheitsmaßnahmen ein:</p>
-    <ul>
-        <li>SSL/TLS-Verschlüsselung</li>
-        <li>Passwort-Hashing (bcrypt)</li>
-        <li>Regelmäßige Sicherheitsaudits</li>
-        <li>Zugriffskontrolle</li>
-        <li>DedSec Security Module für 24/7 Monitoring</li>
-    </ul>
-    
-    <h2>8. Drittanbieter und Auftragsverarbeitung</h2>
-    <table>
-        <tr><th>Dienst</th><th>Anbieter</th><th>Zweck</th><th>Standort</th></tr>
-        <tr><td>WhatsApp Business API</td><td>Meta Platforms</td><td>Messaging</td><td>USA (Standardvertragsklauseln)</td></tr>
-        <tr><td>Claude AI</td><td>Anthropic</td><td>KI-Assistenz</td><td>USA (Standardvertragsklauseln)</td></tr>
-        <tr><td>Hosting</td><td>Hetzner Online GmbH</td><td>Server-Infrastruktur</td><td>Deutschland</td></tr>
-    </table>
-    
-    <h2>9. Änderungen dieser Datenschutzerklärung</h2>
-    <p>Wir behalten uns vor, diese Datenschutzerklärung anzupassen, um sie an geänderte Rechtslagen oder 
-    bei Änderungen des Dienstes anzupassen. Die aktuelle Version finden Sie stets auf dieser Seite.</p>
-    
-    <h2>10. Beschwerderecht</h2>
-    <p>Sie haben das Recht, sich bei einer Aufsichtsbehörde zu beschweren. Die für uns zuständige 
-    Aufsichtsbehörde ist: [Landesbeauftragter für Datenschutz einfügen]</p>
-    '''
-    return Response(legal_page_wrapper('Datenschutzerklärung', content), mimetype='text/html')
-
-@app.route('/agb')
-def agb():
-    content = '''
-    <h1>Allgemeine Geschäftsbedingungen (AGB)</h1>
-    <p class="updated">Stand: Dezember 2025</p>
-    
-    <h2>§ 1 Geltungsbereich</h2>
-    <p>(1) Diese Allgemeinen Geschäftsbedingungen gelten für alle Verträge zwischen der 
-    Enterprise Universe GmbH (nachfolgend "Anbieter") und dem Kunden über die Nutzung der 
-    Software-as-a-Service-Plattform "West Money OS".</p>
-    <p>(2) Abweichende Bedingungen des Kunden werden nicht anerkannt, es sei denn, der Anbieter 
-    stimmt ihrer Geltung ausdrücklich schriftlich zu.</p>
-    
-    <h2>§ 2 Vertragsgegenstand</h2>
-    <p>(1) Der Anbieter stellt dem Kunden die cloudbasierte Business-Plattform "West Money OS" 
-    zur Nutzung bereit. Der Funktionsumfang richtet sich nach dem gewählten Tarif:</p>
-    <ul>
-        <li><strong>Free:</strong> Grundfunktionen, begrenzte Kontakte</li>
-        <li><strong>Professional (€99/Monat):</strong> Erweiterte Features, WhatsApp Integration</li>
-        <li><strong>Enterprise (€299/Monat):</strong> Vollzugriff, API-Zugang, Priority Support</li>
-    </ul>
-    <p>(2) Der Anbieter schuldet die Bereitstellung der Plattform mit einer Verfügbarkeit von 99% 
-    im Jahresmittel, ausgenommen geplante Wartungsarbeiten.</p>
-    
-    <h2>§ 3 Registrierung und Vertragsschluss</h2>
-    <p>(1) Die Registrierung erfolgt über die Website. Mit Absenden der Registrierung gibt der 
-    Kunde ein verbindliches Angebot ab.</p>
-    <p>(2) Der Vertrag kommt mit der Freischaltung des Accounts durch den Anbieter zustande.</p>
-    
-    <h2>§ 4 Pflichten des Kunden</h2>
-    <p>(1) Der Kunde ist verpflichtet:</p>
-    <ul>
-        <li>Seine Zugangsdaten geheim zu halten</li>
-        <li>Die Plattform nur im Rahmen der geltenden Gesetze zu nutzen</li>
-        <li>Keine rechtswidrigen Inhalte zu speichern oder zu verbreiten</li>
-        <li>Bei WhatsApp-Kommunikation die erforderlichen Einwilligungen einzuholen</li>
-    </ul>
-    
-    <h2>§ 5 Zahlungsbedingungen</h2>
-    <p>(1) Die Vergütung richtet sich nach dem gewählten Tarif und ist monatlich im Voraus fällig.</p>
-    <p>(2) Rechnungen werden per E-Mail zugestellt.</p>
-    <p>(3) Bei Zahlungsverzug ist der Anbieter berechtigt, den Zugang zur Plattform zu sperren.</p>
-    
-    <h2>§ 6 Laufzeit und Kündigung</h2>
-    <p>(1) Der Vertrag wird auf unbestimmte Zeit geschlossen.</p>
-    <p>(2) Die Kündigung ist mit einer Frist von 30 Tagen zum Monatsende möglich.</p>
-    <p>(3) Das Recht zur außerordentlichen Kündigung bleibt unberührt.</p>
-    
-    <h2>§ 7 Haftung</h2>
-    <p>(1) Der Anbieter haftet unbeschränkt für Vorsatz und grobe Fahrlässigkeit.</p>
-    <p>(2) Bei leichter Fahrlässigkeit haftet der Anbieter nur bei Verletzung wesentlicher 
-    Vertragspflichten, begrenzt auf den vorhersehbaren, vertragstypischen Schaden.</p>
-    <p>(3) Die Haftung für Datenverlust ist auf den typischen Wiederherstellungsaufwand begrenzt.</p>
-    
-    <h2>§ 8 Datenschutz</h2>
-    <p>Die Verarbeitung personenbezogener Daten erfolgt gemäß unserer Datenschutzerklärung und 
-    im Einklang mit der DSGVO.</p>
-    
-    <h2>§ 9 Änderungen der AGB</h2>
-    <p>(1) Der Anbieter behält sich vor, diese AGB zu ändern.</p>
-    <p>(2) Änderungen werden dem Kunden mindestens 30 Tage vor Inkrafttreten mitgeteilt.</p>
-    <p>(3) Widerspricht der Kunde nicht innerhalb von 14 Tagen, gelten die Änderungen als genehmigt.</p>
-    
-    <h2>§ 10 Schlussbestimmungen</h2>
-    <p>(1) Es gilt das Recht der Bundesrepublik Deutschland.</p>
-    <p>(2) Gerichtsstand ist der Sitz des Anbieters.</p>
-    <p>(3) Sollten einzelne Bestimmungen unwirksam sein, bleibt die Wirksamkeit der übrigen unberührt.</p>
-    '''
-    return Response(legal_page_wrapper('AGB', content), mimetype='text/html')
-
-@app.route('/widerruf')
-def widerruf():
-    content = '''
-    <h1>Widerrufsbelehrung</h1>
-    <p class="updated">Stand: Dezember 2025</p>
-    
-    <h2>Widerrufsrecht</h2>
-    <p>Sie haben das Recht, binnen vierzehn Tagen ohne Angabe von Gründen diesen Vertrag zu widerrufen.</p>
-    <p>Die Widerrufsfrist beträgt vierzehn Tage ab dem Tag des Vertragsabschlusses.</p>
-    
-    <p>Um Ihr Widerrufsrecht auszuüben, müssen Sie uns</p>
-    <div class="highlight">
-        <strong>Enterprise Universe GmbH</strong><br>
-        E-Mail: widerruf@enterprise-universe.de
-    </div>
-    <p>mittels einer eindeutigen Erklärung (z.B. ein mit der Post versandter Brief oder E-Mail) 
-    über Ihren Entschluss, diesen Vertrag zu widerrufen, informieren.</p>
-    
-    <h2>Folgen des Widerrufs</h2>
-    <p>Wenn Sie diesen Vertrag widerrufen, haben wir Ihnen alle Zahlungen, die wir von Ihnen erhalten 
-    haben, unverzüglich und spätestens binnen vierzehn Tagen ab dem Tag zurückzuzahlen, an dem die 
-    Mitteilung über Ihren Widerruf dieses Vertrags bei uns eingegangen ist.</p>
-    
-    <h2>Besondere Hinweise</h2>
-    <p>Haben Sie verlangt, dass die Dienstleistungen während der Widerrufsfrist beginnen sollen, so 
-    haben Sie uns einen angemessenen Betrag zu zahlen, der dem Anteil der bis zu dem Zeitpunkt, zu 
-    dem Sie uns von der Ausübung des Widerrufsrechts hinsichtlich dieses Vertrags unterrichten, 
-    bereits erbrachten Dienstleistungen im Vergleich zum Gesamtumfang der im Vertrag vorgesehenen 
-    Dienstleistungen entspricht.</p>
-    
-    <h2>Muster-Widerrufsformular</h2>
-    <div class="highlight">
-        <p><em>(Wenn Sie den Vertrag widerrufen wollen, dann füllen Sie bitte dieses Formular aus und senden Sie es zurück.)</em></p>
-        <p>An: Enterprise Universe GmbH, E-Mail: widerruf@enterprise-universe.de</p>
-        <p>Hiermit widerrufe(n) ich/wir (*) den von mir/uns (*) abgeschlossenen Vertrag über die 
-        Erbringung der folgenden Dienstleistung: West Money OS</p>
-        <p>Bestellt am (*)/erhalten am (*):</p>
-        <p>Name des/der Verbraucher(s):</p>
-        <p>Anschrift des/der Verbraucher(s):</p>
-        <p>Unterschrift des/der Verbraucher(s) (nur bei Mitteilung auf Papier):</p>
-        <p>Datum:</p>
-        <p><small>(*) Unzutreffendes streichen.</small></p>
-    </div>
-    '''
-    return Response(legal_page_wrapper('Widerrufsbelehrung', content), mimetype='text/html')
-
-# =============================================================================
-# COOKIE CONSENT BANNER (DSGVO)
-# =============================================================================
-COOKIE_BANNER_JS = '''
-<script>
-(function() {
-    if (localStorage.getItem('cookie_consent')) return;
-    
-    const banner = document.createElement('div');
-    banner.id = 'cookie-banner';
-    banner.innerHTML = `
-        <div style="position:fixed;bottom:0;left:0;right:0;background:#1a1a2e;border-top:1px solid rgba(102,126,234,0.3);padding:1.5rem;z-index:9999;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:1rem">
-            <div style="flex:1;min-width:300px">
-                <strong style="color:#667eea">🍪 Cookie-Einstellungen</strong>
-                <p style="margin:0.5rem 0;opacity:0.8;font-size:0.9rem">Wir verwenden Cookies für die Authentifizierung und zur Verbesserung unserer Dienste. 
-                <a href="/datenschutz" style="color:#667eea">Mehr erfahren</a></p>
-            </div>
-            <div style="display:flex;gap:0.75rem">
-                <button onclick="setCookieConsent('essential')" style="padding:0.75rem 1.5rem;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:10px;color:#fff;cursor:pointer">Nur notwendige</button>
-                <button onclick="setCookieConsent('all')" style="padding:0.75rem 1.5rem;background:linear-gradient(135deg,#667eea,#764ba2);border:none;border-radius:10px;color:#fff;cursor:pointer;font-weight:600">Alle akzeptieren</button>
-            </div>
+    {% extends "base" %}
+    {% block content %}
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">🧠 Einstein AI Agency</h1>
+            <p class="page-subtitle">KI-gestützte Business Intelligence</p>
         </div>
-    `;
-    document.body.appendChild(banner);
+    </div>
     
-    window.setCookieConsent = function(type) {
-        localStorage.setItem('cookie_consent', type);
-        localStorage.setItem('cookie_consent_date', new Date().toISOString());
-        document.getElementById('cookie-banner').remove();
-    };
-})();
-</script>
-'''
-
-# =============================================================================
-# WHATSAPP CONSENT MANAGEMENT API
-# =============================================================================
-@app.route('/api/contacts/whatsapp-consent/bulk', methods=['POST'])
-@login_required
-def api_bulk_whatsapp_consent():
-    """Bulk-Update des WhatsApp-Consent-Status für mehrere Kontakte"""
-    data = request.get_json()
-    contact_ids = data.get('contact_ids', [])
-    consent_status = data.get('consent', False)
+    <div class="stats-grid">
+        <div class="stat-card einstein-card">
+            <div class="stat-value">87%</div>
+            <div class="stat-label">Prediction Accuracy</div>
+        </div>
+        <div class="stat-card einstein-card">
+            <div class="stat-value">24</div>
+            <div class="stat-label">Active Insights</div>
+        </div>
+        <div class="stat-card einstein-card">
+            <div class="stat-value">156</div>
+            <div class="stat-label">Automations Run</div>
+        </div>
+        <div class="stat-card einstein-card">
+            <div class="stat-value">€420K</div>
+            <div class="stat-label">Revenue Impact</div>
+        </div>
+    </div>
     
-    if not contact_ids:
-        return jsonify({'success': False, 'error': 'Keine Kontakte ausgewählt'})
-    
-    updated = 0
-    for cid in contact_ids:
-        contact = Contact.query.get(cid)
-        if contact:
-            contact.whatsapp_consent = consent_status
-            updated += 1
-    
-    db.session.commit()
-    
-    # Log für DSGVO-Compliance
-    logger.info(f"WhatsApp consent bulk update: {updated} contacts set to {consent_status} by user {session.get('user_id')}")
-    
-    return jsonify({
-        'success': True, 
-        'updated': updated,
-        'consent_status': consent_status,
-        'timestamp': datetime.utcnow().isoformat()
-    })
-
-@app.route('/api/contacts/export-consent-log')
-@login_required
-def api_export_consent_log():
-    """Export des Consent-Logs für DSGVO-Dokumentation"""
-    contacts = Contact.query.filter_by(whatsapp_consent=True).all()
-    
-    log_data = [{
-        'id': c.id,
-        'name': c.name,
-        'phone': c.phone,
-        'whatsapp_consent': c.whatsapp_consent,
-        'updated_at': c.updated_at.isoformat() if c.updated_at else None
-    } for c in contacts]
-    
-    return jsonify({
-        'success': True,
-        'export_date': datetime.utcnow().isoformat(),
-        'total_with_consent': len(log_data),
-        'contacts': log_data
-    })
-
-@app.route('/api/user/data-export')
-@login_required
-def api_user_data_export():
-    """DSGVO Art. 20 - Datenübertragbarkeit"""
-    user = get_current_user()
-    
-    # Alle Nutzerdaten sammeln
-    contacts = Contact.query.filter_by(user_id=user.id).all()
-    leads = Lead.query.filter_by(assigned_to=user.id).all()
-    messages = Message.query.filter_by(user_id=user.id).all()
-    
-    export = {
-        'export_date': datetime.utcnow().isoformat(),
-        'user': {
-            'id': user.id,
-            'username': user.username,
-            'email': user.email,
-            'name': user.name,
-            'created_at': user.created_at.isoformat() if user.created_at else None
-        },
-        'contacts': [c.to_dict() for c in contacts],
-        'leads': [l.to_dict() for l in leads],
-        'messages': [m.to_dict() for m in messages]
-    }
-    
-    return jsonify({'success': True, 'data': export})
-
-@app.route('/api/user/delete-account', methods=['POST'])
-@login_required
-def api_delete_account():
-    """DSGVO Art. 17 - Recht auf Löschung"""
-    user = get_current_user()
-    data = request.get_json()
-    
-    # Passwort-Bestätigung erforderlich
-    if not user.check_password(data.get('password', '')):
-        return jsonify({'success': False, 'error': 'Passwort falsch'})
-    
-    # Alle verknüpften Daten löschen
-    Contact.query.filter_by(user_id=user.id).delete()
-    Lead.query.filter_by(assigned_to=user.id).delete()
-    Message.query.filter_by(user_id=user.id).delete()
-    ChatHistory.query.filter_by(user_id=user.id).delete()
-    Task.query.filter_by(assigned_to=user.id).delete()
-    TokenTransaction.query.filter_by(user_id=user.id).delete()
-    Automation.query.filter_by(user_id=user.id).delete()
-    
-    # User löschen
-    db.session.delete(user)
-    db.session.commit()
-    
-    session.clear()
-    
-    logger.info(f"Account deleted: User ID {user.id}")
-    
-    return jsonify({'success': True, 'message': 'Konto und alle Daten wurden gelöscht'})
-# =============================================================================
-# WHATSAPP AUTHENTICATION & HUBSPOT CONSENT SYNC
-# Enterprise Universe GmbH © 2025
-# =============================================================================
-
-import hmac
-import hashlib
-import time
-import secrets
-from datetime import datetime, timedelta
-
-# =============================================================================
-# WHATSAPP OTP VERIFICATION MODEL
-# =============================================================================
-class WhatsAppOTP(db.Model):
-    __tablename__ = 'whatsapp_otps'
-    id = db.Column(db.Integer, primary_key=True)
-    phone = db.Column(db.String(20), nullable=False)
-    otp_code = db.Column(db.String(6), nullable=False)
-    purpose = db.Column(db.String(50), default='login')  # login, register, consent, verify
-    expires_at = db.Column(db.DateTime, nullable=False)
-    verified = db.Column(db.Boolean, default=False)
-    attempts = db.Column(db.Integer, default=0)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    def is_valid(self):
-        return not self.verified and self.attempts < 3 and datetime.utcnow() < self.expires_at
-
-# =============================================================================
-# WHATSAPP CONSENT LOG MODEL
-# =============================================================================
-class WhatsAppConsentLog(db.Model):
-    __tablename__ = 'whatsapp_consent_logs'
-    id = db.Column(db.Integer, primary_key=True)
-    contact_id = db.Column(db.Integer, db.ForeignKey('contacts.id'))
-    phone = db.Column(db.String(20), nullable=False)
-    consent_status = db.Column(db.Boolean, nullable=False)
-    consent_source = db.Column(db.String(50))  # web_form, whatsapp_reply, hubspot_sync, bulk_update
-    ip_address = db.Column(db.String(50))
-    user_agent = db.Column(db.String(255))
-    hubspot_synced = db.Column(db.Boolean, default=False)
-    hubspot_sync_at = db.Column(db.DateTime)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-# =============================================================================
-# WHATSAPP OTP GENERATION & SENDING
-# =============================================================================
-def generate_otp():
-    """Generate 6-digit OTP"""
-    return ''.join([str(secrets.randbelow(10)) for _ in range(6)])
-
-def send_whatsapp_otp(phone, otp_code, purpose='verify'):
-    """Send OTP via WhatsApp Business API"""
-    token = os.getenv('WHATSAPP_TOKEN')
-    phone_id = os.getenv('WHATSAPP_PHONE_ID')
-    
-    if not token or not phone_id:
-        logger.warning("WhatsApp not configured - OTP not sent")
-        return False
-    
-    # Format phone number (remove + and spaces)
-    clean_phone = ''.join(filter(str.isdigit, phone))
-    
-    # Message templates based on purpose
-    templates = {
-        'login': f"🔐 Dein West Money OS Login-Code: *{otp_code}*\n\nGültig für 5 Minuten.\n\n_Falls du diesen Code nicht angefordert hast, ignoriere diese Nachricht._",
-        'register': f"👋 Willkommen bei West Money OS!\n\nDein Registrierungs-Code: *{otp_code}*\n\nGültig für 10 Minuten.",
-        'consent': f"✅ WhatsApp Marketing Opt-In\n\nBestätigungscode: *{otp_code}*\n\nMit der Eingabe dieses Codes stimmst du zu, Marketing-Nachrichten von Enterprise Universe GmbH zu erhalten.",
-        'verify': f"📱 Dein Verifizierungscode: *{otp_code}*\n\nGültig für 5 Minuten."
-    }
-    
-    message = templates.get(purpose, templates['verify'])
-    
-    try:
-        url = f"https://graph.facebook.com/v18.0/{phone_id}/messages"
-        headers = {
-            'Authorization': f'Bearer {token}',
-            'Content-Type': 'application/json'
-        }
-        payload = {
-            "messaging_product": "whatsapp",
-            "to": clean_phone,
-            "type": "text",
-            "text": {"body": message}
-        }
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px;">
+        <a href="/einstein/predictions" class="card einstein-card" style="text-decoration: none; color: inherit;">
+            <div style="font-size: 48px; margin-bottom: 16px;">🔮</div>
+            <div class="card-title">Predictions</div>
+            <p style="color: rgba(255,255,255,0.6);">Lead Conversion, Deal Close, Upsell Opportunities</p>
+        </a>
         
-        response = requests.post(url, headers=headers, json=payload, timeout=10)
+        <a href="/einstein/analytics" class="card einstein-card" style="text-decoration: none; color: inherit;">
+            <div style="font-size: 48px; margin-bottom: 16px;">📊</div>
+            <div class="card-title">Deep Analytics</div>
+            <p style="color: rgba(255,255,255,0.6);">KI-gestützte Datenanalyse und Visualisierung</p>
+        </a>
         
-        if response.status_code == 200:
-            logger.info(f"WhatsApp OTP sent to {clean_phone[:4]}***")
-            return True
-        else:
-            logger.error(f"WhatsApp API error: {response.status_code} - {response.text}")
-            return False
-            
-    except Exception as e:
-        logger.error(f"WhatsApp send error: {e}")
-        return False
+        <a href="/einstein/insights" class="card einstein-card" style="text-decoration: none; color: inherit;">
+            <div style="font-size: 48px; margin-bottom: 16px;">💡</div>
+            <div class="card-title">Auto Insights</div>
+            <p style="color: rgba(255,255,255,0.6);">Automatische Business Empfehlungen</p>
+        </a>
+    </div>
+    {% endblock %}
+    '''
+    return render_template_string(BASE_TEMPLATE + content, 
+                                  title="Einstein AI", 
+                                  active_page="einstein")
 
-# =============================================================================
-# WHATSAPP AUTH ROUTES
-# =============================================================================
-@app.route('/auth/whatsapp')
-def whatsapp_auth_page():
-    """WhatsApp Authentication Landing Page"""
-    html = '''<!DOCTYPE html>
-<html lang="de">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WhatsApp Login - West Money OS</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; color: #fff; }
-        .auth-container { width: 100%; max-width: 420px; padding: 2rem; }
-        .auth-card { background: rgba(255,255,255,0.05); backdrop-filter: blur(20px); border-radius: 24px; padding: 2.5rem; border: 1px solid rgba(255,255,255,0.1); }
-        .logo { text-align: center; margin-bottom: 2rem; }
-        .logo h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
-        .logo p { opacity: 0.7; font-size: 0.9rem; }
-        .whatsapp-icon { font-size: 4rem; margin-bottom: 1rem; }
-        .step { display: none; }
-        .step.active { display: block; }
-        .form-group { margin-bottom: 1.5rem; }
-        .form-label { display: block; margin-bottom: 0.5rem; font-weight: 500; }
-        .form-input { width: 100%; padding: 1rem; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; color: #fff; font-size: 1rem; }
-        .form-input:focus { outline: none; border-color: #25D366; }
-        .phone-input { display: flex; gap: 0.5rem; }
-        .country-code { width: 80px; text-align: center; }
-        .btn { width: 100%; padding: 1rem; border: none; border-radius: 12px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: 0.3s; }
-        .btn-whatsapp { background: #25D366; color: #fff; }
-        .btn-whatsapp:hover { background: #128C7E; }
-        .btn-secondary { background: rgba(255,255,255,0.1); color: #fff; margin-top: 1rem; }
-        .otp-inputs { display: flex; gap: 0.5rem; justify-content: center; margin: 1.5rem 0; }
-        .otp-input { width: 50px; height: 60px; text-align: center; font-size: 1.5rem; font-weight: 700; background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.2); border-radius: 12px; color: #fff; }
-        .otp-input:focus { outline: none; border-color: #25D366; }
-        .timer { text-align: center; margin-top: 1rem; opacity: 0.7; }
-        .resend { color: #25D366; cursor: pointer; text-decoration: underline; }
-        .error { background: rgba(239,68,68,0.2); border: 1px solid #ef4444; padding: 1rem; border-radius: 12px; margin-bottom: 1rem; }
-        .success { background: rgba(34,197,94,0.2); border: 1px solid #22c55e; padding: 1rem; border-radius: 12px; margin-bottom: 1rem; }
-        .consent-box { background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 12px; margin: 1rem 0; font-size: 0.85rem; }
-        .consent-box label { display: flex; gap: 0.75rem; cursor: pointer; }
-        .consent-box input[type="checkbox"] { width: 20px; height: 20px; }
-        .legal-links { text-align: center; margin-top: 1.5rem; font-size: 0.8rem; opacity: 0.6; }
-        .legal-links a { color: #667eea; }
-    </style>
-</head>
-<body>
-    <div class="auth-container">
-        <div class="auth-card">
-            <div class="logo">
-                <div class="whatsapp-icon">📱</div>
-                <h1>WhatsApp Login</h1>
-                <p>Schnell & sicher mit deiner Nummer</p>
-            </div>
-            
-            <div id="error-msg" class="error" style="display:none"></div>
-            <div id="success-msg" class="success" style="display:none"></div>
-            
-            <!-- Step 1: Phone Number -->
-            <div id="step1" class="step active">
-                <form onsubmit="sendOTP(event)">
-                    <div class="form-group">
-                        <label class="form-label">Telefonnummer</label>
-                        <div class="phone-input">
-                            <input type="text" class="form-input country-code" value="+49" id="country-code">
-                            <input type="tel" class="form-input" placeholder="123 456789" id="phone-number" required>
-                        </div>
+@app.route('/einstein/predictions')
+@login_required
+def einstein_predictions():
+    content = '''
+    {% extends "base" %}
+    {% block content %}
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">🔮 Einstein Predictions</h1>
+            <p class="page-subtitle">KI-basierte Prognosen für Ihre Leads</p>
+        </div>
+        <a href="/einstein" class="btn btn-secondary">← Zurück zu Einstein</a>
+    </div>
+    
+    <div class="card einstein-card">
+        <div class="card-title">📈 Aktuelle Predictions</div>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Typ</th>
+                        <th>Lead</th>
+                        <th>Prediction</th>
+                        <th>Confidence</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for pred in predictions %}
+                    <tr>
+                        <td>
+                            <span class="badge badge-purple">{{ pred.type.replace('_', ' ').title() }}</span>
+                        </td>
+                        <td><strong>{{ pred.lead }}</strong></td>
+                        <td>{{ pred.prediction }}</td>
+                        <td>
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <div class="progress-bar" style="width: 100px;">
+                                    <div class="progress-fill" style="width: {{ pred.confidence }}%; background: linear-gradient(90deg, #9C27B0, #673AB7);"></div>
+                                </div>
+                                <span>{{ pred.confidence }}%</span>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; margin-top: 24px;">
+        <div class="card">
+            <div class="card-title">🎯 Top Conversion Candidates</div>
+            <div style="padding: 20px 0;">
+                {% for lead in leads[:3] %}
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                    <div>
+                        <strong>{{ lead.name }}</strong>
+                        <div style="font-size: 12px; color: rgba(255,255,255,0.5);">{{ lead.company }}</div>
                     </div>
-                    
-                    <div class="consent-box">
-                        <label>
-                            <input type="checkbox" id="whatsapp-consent" required>
-                            <span>Ich stimme zu, dass West Money OS mir eine Verifizierungsnachricht per WhatsApp sendet. <a href="/datenschutz" target="_blank">Datenschutz</a></span>
-                        </label>
-                    </div>
-                    
-                    <button type="submit" class="btn btn-whatsapp">
-                        📲 Code per WhatsApp senden
-                    </button>
-                </form>
-                
-                <button class="btn btn-secondary" onclick="location.href='/login'">
-                    ← Zurück zum normalen Login
-                </button>
-            </div>
-            
-            <!-- Step 2: OTP Verification -->
-            <div id="step2" class="step">
-                <p style="text-align:center;margin-bottom:1rem">Code wurde gesendet an<br><strong id="display-phone"></strong></p>
-                
-                <div class="otp-inputs">
-                    <input type="text" class="otp-input" maxlength="1" data-index="0">
-                    <input type="text" class="otp-input" maxlength="1" data-index="1">
-                    <input type="text" class="otp-input" maxlength="1" data-index="2">
-                    <input type="text" class="otp-input" maxlength="1" data-index="3">
-                    <input type="text" class="otp-input" maxlength="1" data-index="4">
-                    <input type="text" class="otp-input" maxlength="1" data-index="5">
+                    <div class="badge badge-success">{{ lead.score - 5 + loop.index }}% Likelihood</div>
                 </div>
-                
-                <button class="btn btn-whatsapp" onclick="verifyOTP()">
-                    ✓ Verifizieren
-                </button>
-                
-                <div class="timer" id="timer">
-                    Neuen Code anfordern in <span id="countdown">60</span>s
-                </div>
-                
-                <button class="btn btn-secondary" onclick="goBack()">
-                    ← Andere Nummer verwenden
-                </button>
+                {% endfor %}
             </div>
-            
-            <div class="legal-links">
-                <a href="/impressum">Impressum</a> · 
-                <a href="/datenschutz">Datenschutz</a> · 
-                <a href="/agb">AGB</a>
+        </div>
+        
+        <div class="card">
+            <div class="card-title">⏰ Best Contact Times</div>
+            <div style="padding: 20px 0;">
+                <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                    <span>Montag</span>
+                    <span style="color: #4CAF50;">10:00 - 11:00</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                    <span>Dienstag</span>
+                    <span style="color: #4CAF50;">14:00 - 15:00</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                    <span>Mittwoch</span>
+                    <span style="color: #FF9800;">09:00 - 10:00</span>
+                </div>
             </div>
         </div>
     </div>
+    {% endblock %}
+    '''
+    return render_template_string(BASE_TEMPLATE + content, 
+                                  title="Predictions", 
+                                  active_page="predictions",
+                                  predictions=EINSTEIN_PREDICTIONS,
+                                  leads=LEADS_DATA)
+
+@app.route('/einstein/analytics')
+@login_required
+def einstein_analytics():
+    content = '''
+    {% extends "base" %}
+    {% block content %}
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">📊 Einstein Analytics</h1>
+            <p class="page-subtitle">Deep Learning Datenanalyse</p>
+        </div>
+    </div>
+    
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-value">1.2M</div>
+            <div class="stat-label">Datenpunkte analysiert</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">47</div>
+            <div class="stat-label">ML Models aktiv</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">99.2%</div>
+            <div class="stat-label">Model Accuracy</div>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-title">📈 Performance Analytics</div>
+        <canvas id="analyticsChart" height="300"></canvas>
+    </div>
     
     <script>
-    let phoneNumber = '';
-    let countdownInterval;
-    
-    // OTP Input handling
-    document.querySelectorAll('.otp-input').forEach((input, index) => {
-        input.addEventListener('input', (e) => {
-            if (e.target.value.length === 1 && index < 5) {
-                document.querySelectorAll('.otp-input')[index + 1].focus();
-            }
-            if (document.querySelectorAll('.otp-input').length === 6) {
-                const otp = Array.from(document.querySelectorAll('.otp-input')).map(i => i.value).join('');
-                if (otp.length === 6) verifyOTP();
-            }
-        });
-        input.addEventListener('keydown', (e) => {
-            if (e.key === 'Backspace' && !e.target.value && index > 0) {
-                document.querySelectorAll('.otp-input')[index - 1].focus();
-            }
-        });
-    });
-    
-    async function sendOTP(e) {
-        e.preventDefault();
-        const countryCode = document.getElementById('country-code').value;
-        const phone = document.getElementById('phone-number').value.replace(/ /g, '');
-        phoneNumber = countryCode + phone;
-        
-        try {
-            const res = await fetch('/api/auth/whatsapp/send-otp', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ phone: phoneNumber, purpose: 'login' })
-            });
-            const data = await res.json();
-            
-            if (data.success) {
-                document.getElementById('step1').classList.remove('active');
-                document.getElementById('step2').classList.add('active');
-                document.getElementById('display-phone').textContent = phoneNumber;
-                startCountdown();
-            } else {
-                showError(data.error || 'Fehler beim Senden');
-            }
-        } catch (err) {
-            showError('Verbindungsfehler');
-        }
-    }
-    
-    async function verifyOTP() {
-        const otp = Array.from(document.querySelectorAll('.otp-input')).map(i => i.value).join('');
-        if (otp.length !== 6) return;
-        
-        try {
-            const res = await fetch('/api/auth/whatsapp/verify-otp', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ phone: phoneNumber, otp: otp })
-            });
-            const data = await res.json();
-            
-            if (data.success) {
-                showSuccess('✓ Verifiziert! Weiterleitung...');
-                setTimeout(() => location.href = data.redirect || '/dashboard', 1500);
-            } else {
-                showError(data.error || 'Ungültiger Code');
-                document.querySelectorAll('.otp-input').forEach(i => i.value = '');
-                document.querySelectorAll('.otp-input')[0].focus();
-            }
-        } catch (err) {
-            showError('Verbindungsfehler');
-        }
-    }
-    
-    function startCountdown() {
-        let seconds = 60;
-        document.getElementById('countdown').textContent = seconds;
-        clearInterval(countdownInterval);
-        countdownInterval = setInterval(() => {
-            seconds--;
-            document.getElementById('countdown').textContent = seconds;
-            if (seconds <= 0) {
-                clearInterval(countdownInterval);
-                document.getElementById('timer').innerHTML = '<span class="resend" onclick="resendOTP()">Code erneut senden</span>';
-            }
-        }, 1000);
-    }
-    
-    async function resendOTP() {
-        document.getElementById('timer').innerHTML = 'Sende...';
-        await sendOTP(new Event('submit'));
-    }
-    
-    function goBack() {
-        document.getElementById('step2').classList.remove('active');
-        document.getElementById('step1').classList.add('active');
-        clearInterval(countdownInterval);
-    }
-    
-    function showError(msg) {
-        const el = document.getElementById('error-msg');
-        el.textContent = msg;
-        el.style.display = 'block';
-        setTimeout(() => el.style.display = 'none', 5000);
-    }
-    
-    function showSuccess(msg) {
-        const el = document.getElementById('success-msg');
-        el.textContent = msg;
-        el.style.display = 'block';
-    }
-    </script>
-</body>
-</html>'''
-    return Response(html, mimetype='text/html')
-
-# =============================================================================
-# WHATSAPP AUTH API ENDPOINTS
-# =============================================================================
-@app.route('/api/auth/whatsapp/send-otp', methods=['POST'])
-def api_send_whatsapp_otp():
-    """Send OTP via WhatsApp for authentication"""
-    data = request.get_json()
-    phone = data.get('phone', '').strip()
-    purpose = data.get('purpose', 'login')
-    
-    if not phone or len(phone) < 8:
-        return jsonify({'success': False, 'error': 'Ungültige Telefonnummer'})
-    
-    # Rate limiting - max 3 OTPs per phone per hour
-    recent_otps = WhatsAppOTP.query.filter(
-        WhatsAppOTP.phone == phone,
-        WhatsAppOTP.created_at > datetime.utcnow() - timedelta(hours=1)
-    ).count()
-    
-    if recent_otps >= 3:
-        return jsonify({'success': False, 'error': 'Zu viele Anfragen. Bitte warte eine Stunde.'})
-    
-    # Generate OTP
-    otp_code = generate_otp()
-    expires_minutes = 10 if purpose == 'register' else 5
-    
-    # Save to database
-    otp = WhatsAppOTP(
-        phone=phone,
-        otp_code=otp_code,
-        purpose=purpose,
-        expires_at=datetime.utcnow() + timedelta(minutes=expires_minutes)
-    )
-    db.session.add(otp)
-    db.session.commit()
-    
-    # Send via WhatsApp
-    sent = send_whatsapp_otp(phone, otp_code, purpose)
-    
-    if sent:
-        return jsonify({'success': True, 'message': 'OTP gesendet', 'expires_in': expires_minutes * 60})
-    else:
-        # For development/testing - show OTP if WhatsApp not configured
-        if not os.getenv('WHATSAPP_TOKEN'):
-            return jsonify({'success': True, 'message': 'OTP generiert (WhatsApp nicht konfiguriert)', 'dev_otp': otp_code})
-        return jsonify({'success': False, 'error': 'WhatsApp Versand fehlgeschlagen'})
-
-@app.route('/api/auth/whatsapp/verify-otp', methods=['POST'])
-def api_verify_whatsapp_otp():
-    """Verify OTP and create/login user"""
-    data = request.get_json()
-    phone = data.get('phone', '').strip()
-    otp_input = data.get('otp', '').strip()
-    
-    if not phone or not otp_input:
-        return jsonify({'success': False, 'error': 'Telefonnummer und Code erforderlich'})
-    
-    # Find valid OTP
-    otp = WhatsAppOTP.query.filter(
-        WhatsAppOTP.phone == phone,
-        WhatsAppOTP.verified == False,
-        WhatsAppOTP.expires_at > datetime.utcnow()
-    ).order_by(WhatsAppOTP.created_at.desc()).first()
-    
-    if not otp:
-        return jsonify({'success': False, 'error': 'Kein gültiger Code gefunden. Bitte neu anfordern.'})
-    
-    if otp.attempts >= 3:
-        return jsonify({'success': False, 'error': 'Zu viele Versuche. Bitte neuen Code anfordern.'})
-    
-    otp.attempts += 1
-    
-    if otp.otp_code != otp_input:
-        db.session.commit()
-        remaining = 3 - otp.attempts
-        return jsonify({'success': False, 'error': f'Ungültiger Code. Noch {remaining} Versuche.'})
-    
-    # OTP valid - mark as verified
-    otp.verified = True
-    db.session.commit()
-    
-    # Find or create user
-    user = User.query.filter_by(phone=phone).first()
-    
-    if not user:
-        # Create new user from phone
-        username = f"user_{phone[-6:]}"
-        # Ensure unique username
-        counter = 1
-        while User.query.filter_by(username=username).first():
-            username = f"user_{phone[-6:]}_{counter}"
-            counter += 1
-        
-        user = User(
-            username=username,
-            email=f"{username}@whatsapp.user",
-            phone=phone,
-            name=f"WhatsApp User",
-            role='user',
-            plan='free',
-            tokens_god=100,
-            tokens_dedsec=50
-        )
-        user.set_password(secrets.token_hex(16))  # Random password
-        db.session.add(user)
-        
-        # Log consent
-        consent_log = WhatsAppConsentLog(
-            phone=phone,
-            consent_status=True,
-            consent_source='whatsapp_auth',
-            ip_address=request.remote_addr,
-            user_agent=request.headers.get('User-Agent', '')[:255]
-        )
-        db.session.add(consent_log)
-        db.session.commit()
-        
-        logger.info(f"New user created via WhatsApp: {username}")
-    
-    # Login user
-    session.permanent = True
-    session['user_id'] = user.id
-    user.last_login = datetime.utcnow()
-    db.session.commit()
-    
-    # Award login tokens
-    award_tokens(user.id, 'god', 5, 'whatsapp_login', 'WhatsApp Login Bonus')
-    
-    return jsonify({
-        'success': True,
-        'message': 'Erfolgreich verifiziert',
-        'redirect': '/dashboard',
-        'user': {'id': user.id, 'name': user.name}
-    })
-
-# =============================================================================
-# HUBSPOT CONSENT SYNC
-# =============================================================================
-def sync_consent_to_hubspot(contact_id, phone, consent_status):
-    """Sync WhatsApp consent to HubSpot contact"""
-    api_key = os.getenv('HUBSPOT_API_KEY')
-    
-    if not api_key:
-        logger.warning("HubSpot not configured - consent not synced")
-        return False
-    
-    try:
-        # Search for contact by phone
-        search_url = "https://api.hubapi.com/crm/v3/objects/contacts/search"
-        headers = {
-            'Authorization': f'Bearer {api_key}',
-            'Content-Type': 'application/json'
-        }
-        
-        # Clean phone number for search
-        clean_phone = phone.replace('+', '').replace(' ', '')
-        
-        search_payload = {
-            "filterGroups": [{
-                "filters": [{
-                    "propertyName": "phone",
-                    "operator": "CONTAINS_TOKEN",
-                    "value": clean_phone[-10:]  # Last 10 digits
+        const ctx = document.getElementById('analyticsChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+                datasets: [{
+                    label: 'Revenue',
+                    data: [45, 52, 48, 61, 55, 67, 72, 78, 85, 89, 95, 102],
+                    borderColor: '#9C27B0',
+                    backgroundColor: 'rgba(156, 39, 176, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                }, {
+                    label: 'Leads',
+                    data: [12, 19, 15, 25, 22, 30, 28, 35, 40, 42, 48, 55],
+                    borderColor: '#673AB7',
+                    backgroundColor: 'rgba(103, 58, 183, 0.1)',
+                    fill: true,
+                    tension: 0.4
                 }]
-            }],
-            "properties": ["phone", "email", "firstname", "lastname", "hs_whatsapp_consent"]
-        }
-        
-        response = requests.post(search_url, headers=headers, json=search_payload, timeout=10)
-        
-        if response.status_code == 200:
-            results = response.json().get('results', [])
-            
-            if results:
-                hubspot_id = results[0]['id']
-                
-                # Update consent property
-                update_url = f"https://api.hubapi.com/crm/v3/objects/contacts/{hubspot_id}"
-                update_payload = {
-                    "properties": {
-                        "hs_whatsapp_consent": "GRANTED" if consent_status else "DENIED",
-                        "hs_whatsapp_consent_date": datetime.utcnow().isoformat()
-                    }
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { labels: { color: 'rgba(255,255,255,0.7)' } } },
+                scales: {
+                    y: { grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: 'rgba(255,255,255,0.6)' } },
+                    x: { grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: 'rgba(255,255,255,0.6)' } }
                 }
-                
-                update_response = requests.patch(update_url, headers=headers, json=update_payload, timeout=10)
-                
-                if update_response.status_code == 200:
-                    logger.info(f"HubSpot consent synced for contact {hubspot_id}")
-                    
-                    # Update our consent log
-                    consent_log = WhatsAppConsentLog.query.filter_by(
-                        contact_id=contact_id
-                    ).order_by(WhatsAppConsentLog.created_at.desc()).first()
-                    
-                    if consent_log:
-                        consent_log.hubspot_synced = True
-                        consent_log.hubspot_sync_at = datetime.utcnow()
-                        db.session.commit()
-                    
-                    return True
-                else:
-                    logger.error(f"HubSpot update failed: {update_response.status_code}")
-                    return False
-            else:
-                logger.info(f"Contact not found in HubSpot: {phone}")
-                return False
-        else:
-            logger.error(f"HubSpot search failed: {response.status_code}")
-            return False
-            
-    except Exception as e:
-        logger.error(f"HubSpot sync error: {e}")
-        return False
+            }
+        });
+    </script>
+    {% endblock %}
+    '''
+    return render_template_string(BASE_TEMPLATE + content, 
+                                  title="Analytics", 
+                                  active_page="analytics")
 
-@app.route('/api/hubspot/sync-consent', methods=['POST'])
-@login_required
-def api_hubspot_sync_consent():
-    """Manually sync all consent statuses to HubSpot"""
-    contacts = Contact.query.filter(
-        Contact.phone.isnot(None),
-        Contact.whatsapp_consent == True
-    ).all()
+@app.route('/einstein/insights')
+@login_required  
+def einstein_insights():
+    content = '''
+    {% extends "base" %}
+    {% block content %}
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">💡 Einstein Insights</h1>
+            <p class="page-subtitle">Automatische Business Empfehlungen</p>
+        </div>
+    </div>
     
-    synced = 0
-    failed = 0
-    
-    for contact in contacts:
-        success = sync_consent_to_hubspot(contact.id, contact.phone, contact.whatsapp_consent)
-        if success:
-            synced += 1
-        else:
-            failed += 1
-    
-    return jsonify({
-        'success': True,
-        'synced': synced,
-        'failed': failed,
-        'total': len(contacts)
-    })
+    <div class="card einstein-card">
+        <div class="card-title">🎯 Aktuelle Empfehlungen</div>
+        
+        <div style="padding: 20px; background: rgba(76,175,80,0.1); border: 1px solid rgba(76,175,80,0.3); border-radius: 12px; margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: start;">
+                <div>
+                    <div style="color: #4CAF50; font-weight: 600;">🔥 Hot Opportunity</div>
+                    <div style="margin-top: 8px;">Kontaktieren Sie <strong>Thomas Moser (Loxone)</strong> diese Woche - 87% Conversion Wahrscheinlichkeit</div>
+                </div>
+                <button class="btn btn-primary">Aktion starten</button>
+            </div>
+        </div>
+        
+        <div style="padding: 20px; background: rgba(255,152,0,0.1); border: 1px solid rgba(255,152,0,0.3); border-radius: 12px; margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: start;">
+                <div>
+                    <div style="color: #FF9800; font-weight: 600;">📈 Upsell Potenzial</div>
+                    <div style="margin-top: 8px;"><strong>Mainova AG</strong> - €150k zusätzliches Potenzial für PV-Integration identifiziert</div>
+                </div>
+                <button class="btn btn-secondary">Details</button>
+            </div>
+        </div>
+        
+        <div style="padding: 20px; background: rgba(33,150,243,0.1); border: 1px solid rgba(33,150,243,0.3); border-radius: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: start;">
+                <div>
+                    <div style="color: #2196F3; font-weight: 600;">📊 Trend Alert</div>
+                    <div style="margin-top: 8px;">Smart Home Anfragen +45% in den letzten 30 Tagen - Marketing Budget erhöhen?</div>
+                </div>
+                <button class="btn btn-secondary">Analysieren</button>
+            </div>
+        </div>
+    </div>
+    {% endblock %}
+    '''
+    return render_template_string(BASE_TEMPLATE + content, 
+                                  title="Insights", 
+                                  active_page="insights")
 
-@app.route('/api/hubspot/import-contacts', methods=['POST'])
+# ============================================================================
+# ROUTES - DEDSEC SECURITY
+# ============================================================================
+@app.route('/dedsec')
 @login_required
-def api_hubspot_import_contacts():
-    """Import contacts from HubSpot with consent status"""
-    api_key = os.getenv('HUBSPOT_API_KEY')
+def dedsec():
+    content = '''
+    {% extends "base" %}
+    {% block content %}
+    <div class="page-header">
+        <div>
+            <h1 class="page-title" style="color: #00D4FF;">🛡️ DedSec Security Hub</h1>
+            <p class="page-subtitle">Enterprise Security Ecosystem</p>
+        </div>
+        <div class="badge badge-success pulse">● All Systems Online</div>
+    </div>
     
-    if not api_key:
-        return jsonify({'success': False, 'error': 'HubSpot nicht konfiguriert'})
+    <div class="stats-grid">
+        <div class="stat-card dedsec-card">
+            <div class="stat-value" style="color: #00D4FF;">24</div>
+            <div class="stat-label">Active Cameras</div>
+        </div>
+        <div class="stat-card dedsec-card">
+            <div class="stat-value" style="color: #00FF41;">2</div>
+            <div class="stat-label">Patrol Drones</div>
+        </div>
+        <div class="stat-card dedsec-card">
+            <div class="stat-value" style="color: #00D4FF;">1,247</div>
+            <div class="stat-label">Threats Blocked</div>
+        </div>
+        <div class="stat-card dedsec-card">
+            <div class="stat-value" style="color: #00FF41;">100%</div>
+            <div class="stat-label">Uptime</div>
+        </div>
+    </div>
     
-    try:
-        url = "https://api.hubapi.com/crm/v3/objects/contacts"
-        headers = {'Authorization': f'Bearer {api_key}'}
-        params = {
-            'limit': 100,
-            'properties': 'firstname,lastname,email,phone,company,hs_whatsapp_consent'
-        }
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px;">
+        <a href="/dedsec/tower" class="card dedsec-card" style="text-decoration: none; color: inherit;">
+            <div style="font-size: 48px; margin-bottom: 16px;">🗼</div>
+            <div class="card-title">Command Tower</div>
+            <p style="color: rgba(255,255,255,0.6);">Zentrale Überwachung & Kontrolle</p>
+        </a>
         
-        response = requests.get(url, headers=headers, params=params, timeout=15)
+        <a href="/dedsec/drones" class="card dedsec-card" style="text-decoration: none; color: inherit;">
+            <div style="font-size: 48px; margin-bottom: 16px;">🚁</div>
+            <div class="card-title">Drone Control</div>
+            <p style="color: rgba(255,255,255,0.6);">Autonome Patrouillen-Drohnen</p>
+        </a>
         
-        if response.status_code != 200:
-            return jsonify({'success': False, 'error': f'HubSpot API Fehler: {response.status_code}'})
-        
-        contacts_data = response.json().get('results', [])
-        imported = 0
-        updated = 0
-        
-        for hc in contacts_data:
-            props = hc.get('properties', {})
-            email = props.get('email')
-            phone = props.get('phone')
-            
-            if not email and not phone:
-                continue
-            
-            # Check if contact exists
-            existing = None
-            if email:
-                existing = Contact.query.filter_by(email=email).first()
-            if not existing and phone:
-                existing = Contact.query.filter_by(phone=phone).first()
-            
-            name = f"{props.get('firstname', '')} {props.get('lastname', '')}".strip() or 'Unbekannt'
-            consent = props.get('hs_whatsapp_consent') == 'GRANTED'
-            
-            if existing:
-                existing.name = name
-                existing.phone = phone or existing.phone
-                existing.company = props.get('company') or existing.company
-                existing.whatsapp_consent = consent
-                existing.hubspot_id = hc.get('id')
-                updated += 1
-            else:
-                contact = Contact(
-                    name=name,
-                    email=email,
-                    phone=phone,
-                    company=props.get('company'),
-                    whatsapp_consent=consent,
-                    hubspot_id=hc.get('id'),
-                    user_id=session.get('user_id')
-                )
-                db.session.add(contact)
-                imported += 1
-        
-        db.session.commit()
-        
-        return jsonify({
-            'success': True,
-            'imported': imported,
-            'updated': updated,
-            'total': len(contacts_data)
-        })
-        
-    except Exception as e:
-        logger.error(f"HubSpot import error: {e}")
-        return jsonify({'success': False, 'error': str(e)})
-
-# =============================================================================
-# WEBHOOK FOR WHATSAPP CONSENT REPLIES
-# =============================================================================
-@app.route('/webhook/whatsapp', methods=['GET', 'POST'])
-def whatsapp_webhook():
-    """WhatsApp Business API Webhook"""
-    if request.method == 'GET':
-        # Verification challenge
-        mode = request.args.get('hub.mode')
-        token = request.args.get('hub.verify_token')
-        challenge = request.args.get('hub.challenge')
-        
-        verify_token = os.getenv('WHATSAPP_VERIFY_TOKEN', 'westmoney_verify_2025')
-        
-        if mode == 'subscribe' and token == verify_token:
-            logger.info("WhatsApp webhook verified")
-            return challenge, 200
-        return 'Forbidden', 403
+        <a href="/dedsec/cctv" class="card dedsec-card" style="text-decoration: none; color: inherit;">
+            <div style="font-size: 48px; margin-bottom: 16px;">📹</div>
+            <div class="card-title">CCTV Network</div>
+            <p style="color: rgba(255,255,255,0.6);">24 Kameras live</p>
+        </a>
+    </div>
     
-    # Handle incoming messages
-    try:
-        data = request.get_json()
-        
-        if data and 'entry' in data:
-            for entry in data['entry']:
-                for change in entry.get('changes', []):
-                    value = change.get('value', {})
-                    messages = value.get('messages', [])
-                    
-                    for message in messages:
-                        phone = message.get('from')
-                        text = message.get('text', {}).get('body', '').lower().strip()
-                        
-                        # Check for consent keywords
-                        if text in ['ja', 'yes', 'ok', 'zustimmen', 'einwilligen', 'opt-in', 'start']:
-                            # Grant consent
-                            contact = Contact.query.filter_by(phone=phone).first()
-                            if contact:
-                                contact.whatsapp_consent = True
-                                
-                                # Log consent
-                                consent_log = WhatsAppConsentLog(
-                                    contact_id=contact.id,
-                                    phone=phone,
-                                    consent_status=True,
-                                    consent_source='whatsapp_reply'
-                                )
-                                db.session.add(consent_log)
-                                db.session.commit()
-                                
-                                # Sync to HubSpot
-                                sync_consent_to_hubspot(contact.id, phone, True)
-                                
-                                logger.info(f"Consent granted via WhatsApp: {phone}")
-                        
-                        elif text in ['nein', 'no', 'stop', 'abmelden', 'widerrufen', 'opt-out']:
-                            # Revoke consent
-                            contact = Contact.query.filter_by(phone=phone).first()
-                            if contact:
-                                contact.whatsapp_consent = False
-                                
-                                consent_log = WhatsAppConsentLog(
-                                    contact_id=contact.id,
-                                    phone=phone,
-                                    consent_status=False,
-                                    consent_source='whatsapp_reply'
-                                )
-                                db.session.add(consent_log)
-                                db.session.commit()
-                                
-                                sync_consent_to_hubspot(contact.id, phone, False)
-                                
-                                logger.info(f"Consent revoked via WhatsApp: {phone}")
-        
-        return 'OK', 200
-        
-    except Exception as e:
-        logger.error(f"Webhook error: {e}")
-        return 'Error', 500
-# =============================================================================
-# API ROUTES
-# =============================================================================
-# Contacts API
-@app.route('/api/contacts', methods=['GET', 'POST'])
-@login_required
-def api_contacts():
-    if request.method == 'POST':
-        data = request.get_json()
-        tags = data.get('tags', '')
-        if isinstance(tags, str):
-            tags = json.dumps([t.strip() for t in tags.split(',') if t.strip()])
-        contact = Contact(name=data.get('name'), email=data.get('email'), phone=data.get('phone'), company=data.get('company'), position=data.get('position'), whatsapp_consent=data.get('whatsapp_consent', False), tags=tags, notes=data.get('notes'), user_id=session.get('user_id'))
-        db.session.add(contact)
-        db.session.commit()
-        award_tokens(session.get('user_id'), 'god', 5, 'Kontakt erstellt')
-        return jsonify({'success': True, 'contact': contact.to_dict()})
-    contacts = Contact.query.order_by(Contact.created_at.desc()).all()
-    return jsonify({'success': True, 'contacts': [c.to_dict() for c in contacts]})
+    <div class="card dedsec-card" style="margin-top: 24px;">
+        <div class="card-title">🖥️ System Status</div>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>System</th>
+                        <th>Status</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for sys in systems %}
+                    <tr>
+                        <td><strong>{{ sys.name }}</strong></td>
+                        <td>
+                            <span class="badge badge-{% if sys.status == 'online' or sys.status == 'active' or sys.status == 'locked' %}success{% elif sys.status == 'charging' %}warning{% else %}danger{% endif %}">
+                                {{ sys.status }}
+                            </span>
+                        </td>
+                        <td style="color: rgba(255,255,255,0.6);">
+                            {% if sys.cameras %}{{ sys.cameras }} Cameras{% endif %}
+                            {% if sys.battery %}Battery: {{ sys.battery }}%{% endif %}
+                            {% if sys.blocked %}{{ sys.blocked }} blocked{% endif %}
+                            {% if sys.files %}{{ sys.files }} files{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endblock %}
+    '''
+    return render_template_string(BASE_TEMPLATE + content, 
+                                  title="DedSec Security", 
+                                  active_page="dedsec",
+                                  systems=DEDSEC_SYSTEMS)
 
-@app.route('/api/contacts/<int:id>', methods=['GET', 'PUT', 'DELETE'])
+@app.route('/dedsec/tower')
 @login_required
-def api_contact(id):
-    contact = Contact.query.get_or_404(id)
-    if request.method == 'DELETE':
-        db.session.delete(contact)
-        db.session.commit()
-        return jsonify({'success': True})
-    if request.method == 'PUT':
-        data = request.get_json()
-        contact.name = data.get('name', contact.name)
-        contact.email = data.get('email', contact.email)
-        contact.phone = data.get('phone', contact.phone)
-        contact.company = data.get('company', contact.company)
-        contact.position = data.get('position', contact.position)
-        contact.whatsapp_consent = data.get('whatsapp_consent', contact.whatsapp_consent)
-        tags = data.get('tags', '')
-        if isinstance(tags, str):
-            contact.tags = json.dumps([t.strip() for t in tags.split(',') if t.strip()])
-        contact.notes = data.get('notes', contact.notes)
-        db.session.commit()
-        return jsonify({'success': True, 'contact': contact.to_dict()})
-    return jsonify({'success': True, 'contact': contact.to_dict()})
+def dedsec_tower():
+    content = '''
+    {% extends "base" %}
+    {% block content %}
+    <div class="page-header">
+        <div>
+            <h1 class="page-title" style="color: #00D4FF;">🗼 Command Tower</h1>
+            <p class="page-subtitle">Zentrale Überwachung Frankfurt</p>
+        </div>
+        <div class="badge badge-success pulse">● LIVE</div>
+    </div>
+    
+    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px;">
+        <div class="card dedsec-card">
+            <div class="card-title">📍 Live Map</div>
+            <div style="height: 400px; background: linear-gradient(135deg, #0d1117, #161b22); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #00D4FF;">
+                <div style="text-align: center;">
+                    <div style="font-size: 64px; margin-bottom: 16px;">🗺️</div>
+                    <div>Live Security Map</div>
+                    <div style="font-size: 12px; color: rgba(255,255,255,0.5);">24 Kameras | 2 Drohnen aktiv</div>
+                </div>
+            </div>
+        </div>
+        
+        <div>
+            <div class="card dedsec-card" style="margin-bottom: 24px;">
+                <div class="card-title">⚡ Quick Actions</div>
+                <button class="btn btn-primary" style="width: 100%; margin-bottom: 12px;">🚨 Alarm aktivieren</button>
+                <button class="btn btn-secondary" style="width: 100%; margin-bottom: 12px;">🔒 Lockdown</button>
+                <button class="btn btn-secondary" style="width: 100%;">📹 Alle Kameras</button>
+            </div>
+            
+            <div class="card dedsec-card">
+                <div class="card-title">📊 Statistiken heute</div>
+                <div style="padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Bewegungen erkannt</span>
+                        <span style="color: #00D4FF;">47</span>
+                    </div>
+                </div>
+                <div style="padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Alerts</span>
+                        <span style="color: #00FF41;">0</span>
+                    </div>
+                </div>
+                <div style="padding: 12px 0;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>System Health</span>
+                        <span style="color: #00FF41;">100%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endblock %}
+    '''
+    return render_template_string(BASE_TEMPLATE + content, 
+                                  title="Command Tower", 
+                                  active_page="tower")
 
-# Leads API
-@app.route('/api/leads', methods=['GET', 'POST'])
+@app.route('/dedsec/drones')
 @login_required
+def dedsec_drones():
+    content = '''
+    {% extends "base" %}
+    {% block content %}
+    <div class="page-header">
+        <div>
+            <h1 class="page-title" style="color: #00D4FF;">🚁 Drone Control</h1>
+            <p class="page-subtitle">Autonome Patrouillen-Drohnen</p>
+        </div>
+    </div>
+    
+    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px;">
+        <div class="card dedsec-card">
+            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 20px;">
+                <div>
+                    <div class="card-title">Patrol Drone Alpha</div>
+                    <span class="badge badge-success">● Active</span>
+                </div>
+                <div style="font-size: 48px;">🚁</div>
+            </div>
+            <div style="padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                <div style="display: flex; justify-content: space-between;">
+                    <span>Battery</span>
+                    <span style="color: #00FF41;">87%</span>
+                </div>
+                <div class="progress-bar" style="margin-top: 8px;">
+                    <div class="progress-fill" style="width: 87%; background: linear-gradient(90deg, #00D4FF, #00FF41);"></div>
+                </div>
+            </div>
+            <div style="padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                <div style="display: flex; justify-content: space-between;">
+                    <span>Location</span>
+                    <span>Sector A</span>
+                </div>
+            </div>
+            <div style="padding: 12px 0;">
+                <div style="display: flex; justify-content: space-between;">
+                    <span>Flight Time</span>
+                    <span>2h 34m</span>
+                </div>
+            </div>
+            <button class="btn btn-secondary" style="width: 100%; margin-top: 16px;">📍 Track Live</button>
+        </div>
+        
+        <div class="card dedsec-card">
+            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 20px;">
+                <div>
+                    <div class="card-title">Patrol Drone Beta</div>
+                    <span class="badge badge-warning">● Charging</span>
+                </div>
+                <div style="font-size: 48px;">🔋</div>
+            </div>
+            <div style="padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                <div style="display: flex; justify-content: space-between;">
+                    <span>Battery</span>
+                    <span style="color: #FF9800;">23%</span>
+                </div>
+                <div class="progress-bar" style="margin-top: 8px;">
+                    <div class="progress-fill" style="width: 23%; background: linear-gradient(90deg, #FF9800, #FFC107);"></div>
+                </div>
+            </div>
+            <div style="padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                <div style="display: flex; justify-content: space-between;">
+                    <span>Location</span>
+                    <span>Base Station</span>
+                </div>
+            </div>
+            <div style="padding: 12px 0;">
+                <div style="display: flex; justify-content: space-between;">
+                    <span>ETA Full</span>
+                    <span>45 min</span>
+                </div>
+            </div>
+            <button class="btn btn-secondary" style="width: 100%; margin-top: 16px;" disabled>⏳ Charging...</button>
+        </div>
+    </div>
+    {% endblock %}
+    '''
+    return render_template_string(BASE_TEMPLATE + content, 
+                                  title="Drone Control", 
+                                  active_page="drones")
+
+@app.route('/dedsec/cctv')
+@login_required
+def dedsec_cctv():
+    content = '''
+    {% extends "base" %}
+    {% block content %}
+    <div class="page-header">
+        <div>
+            <h1 class="page-title" style="color: #00D4FF;">📹 CCTV Network</h1>
+            <p class="page-subtitle">24 Kameras | Live Überwachung</p>
+        </div>
+        <div class="badge badge-success pulse">● 24/24 Online</div>
+    </div>
+    
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;">
+        {% for i in range(1, 9) %}
+        <div class="card dedsec-card" style="padding: 0; overflow: hidden;">
+            <div style="height: 120px; background: linear-gradient(135deg, #0d1117, #161b22); display: flex; align-items: center; justify-content: center;">
+                <span style="font-size: 32px;">📹</span>
+            </div>
+            <div style="padding: 12px;">
+                <div style="font-weight: 600; font-size: 14px;">CAM-{{ "%02d"|format(i) }}</div>
+                <div style="font-size: 12px; color: rgba(255,255,255,0.5);">Sector {{ ['A', 'A', 'B', 'B', 'C', 'C', 'D', 'D'][i-1] }}</div>
+                <span class="badge badge-success" style="margin-top: 8px; font-size: 10px;">● Live</span>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endblock %}
+    '''
+    return render_template_string(BASE_TEMPLATE + content, 
+                                  title="CCTV", 
+                                  active_page="cctv")
+
+# ============================================================================
+# ROUTES - OTHER MODULES
+# ============================================================================
+@app.route('/whatsapp')
+@login_required
+def whatsapp():
+    content = '''
+    {% extends "base" %}
+    {% block content %}
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">💬 WhatsApp Business</h1>
+            <p class="page-subtitle">Kunden-Kommunikation & Kampagnen</p>
+        </div>
+    </div>
+    
+    <div class="stats-grid">
+        <div class="stat-card" style="background: linear-gradient(135deg, rgba(37,211,102,0.2), rgba(37,211,102,0.05)); border-color: rgba(37,211,102,0.3);">
+            <div class="stat-value" style="color: #25D366;">1,247</div>
+            <div class="stat-label">Kontakte</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, rgba(37,211,102,0.2), rgba(37,211,102,0.05)); border-color: rgba(37,211,102,0.3);">
+            <div class="stat-value" style="color: #25D366;">89%</div>
+            <div class="stat-label">Open Rate</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, rgba(37,211,102,0.2), rgba(37,211,102,0.05)); border-color: rgba(37,211,102,0.3);">
+            <div class="stat-value" style="color: #25D366;">12</div>
+            <div class="stat-label">Aktive Kampagnen</div>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-title">📱 WhatsApp Integration Status</div>
+        <p style="color: rgba(255,255,255,0.6); margin-bottom: 20px;">Verbinden Sie Ihre WhatsApp Business API für automatisierte Kundenkommunikation.</p>
+        <button class="btn btn-primary" style="background: linear-gradient(135deg, #25D366, #128C7E);">🔗 WhatsApp verbinden</button>
+    </div>
+    {% endblock %}
+    '''
+    return render_template_string(BASE_TEMPLATE + content, 
+                                  title="WhatsApp", 
+                                  active_page="whatsapp")
+
+@app.route('/godbot')
+@login_required
+def godbot():
+    content = '''
+    {% extends "base" %}
+    {% block content %}
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">🤖 GOD BOT AI</h1>
+            <p class="page-subtitle">Ihr intelligenter Business-Assistent</p>
+        </div>
+    </div>
+    
+    <div class="card" style="background: linear-gradient(135deg, rgba(255,215,0,0.1), rgba(255,87,34,0.05)); border-color: rgba(255,215,0,0.3);">
+        <div style="text-align: center; padding: 60px 20px;">
+            <div style="font-size: 80px; margin-bottom: 24px;">🤖</div>
+            <h2 style="font-size: 28px; margin-bottom: 12px;">GOD MODE ACTIVATED</h2>
+            <p style="color: rgba(255,255,255,0.6); margin-bottom: 32px;">Ultra Instinct AI Assistant - Bereit für Ihre Befehle</p>
+            
+            <div style="max-width: 600px; margin: 0 auto;">
+                <div style="display: flex; gap: 12px;">
+                    <input type="text" placeholder="Frag GOD BOT etwas..." style="flex: 1; padding: 16px 20px; border-radius: 12px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; font-size: 16px;">
+                    <button class="btn btn-primary" style="background: linear-gradient(135deg, #FFD700, #FF5722);">⚡ Senden</button>
+                </div>
+            </div>
+            
+            <div style="margin-top: 40px; display: flex; justify-content: center; gap: 16px; flex-wrap: wrap;">
+                <span class="badge badge-warning">💡 "Analysiere meine Pipeline"</span>
+                <span class="badge badge-warning">📧 "Schreibe eine E-Mail an Loxone"</span>
+                <span class="badge badge-warning">📊 "Erstelle einen Report"</span>
+            </div>
+        </div>
+    </div>
+    {% endblock %}
+    '''
+    return render_template_string(BASE_TEMPLATE + content, 
+                                  title="GOD BOT", 
+                                  active_page="godbot")
+
+@app.route('/locker')
+@login_required
+def locker():
+    content = '''
+    {% extends "base" %}
+    {% block content %}
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">🔐 Private Locker</h1>
+            <p class="page-subtitle">Sichere Dokumenten-Ablage</p>
+        </div>
+        <button class="btn btn-primary">📤 Upload</button>
+    </div>
+    
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-value">892</div>
+            <div class="stat-label">Dokumente</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">45</div>
+            <div class="stat-label">Verträge</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">128</div>
+            <div class="stat-label">Rechnungen</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">2.4 GB</div>
+            <div class="stat-label">Speicher genutzt</div>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-title">📁 Ordner</div>
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;">
+            <div style="padding: 24px; background: rgba(255,255,255,0.05); border-radius: 12px; text-align: center; cursor: pointer;">
+                <div style="font-size: 40px; margin-bottom: 8px;">📄</div>
+                <div>Dokumente</div>
+                <div style="font-size: 12px; color: rgba(255,255,255,0.5);">892 Dateien</div>
+            </div>
+            <div style="padding: 24px; background: rgba(255,255,255,0.05); border-radius: 12px; text-align: center; cursor: pointer;">
+                <div style="font-size: 40px; margin-bottom: 8px;">📝</div>
+                <div>Verträge</div>
+                <div style="font-size: 12px; color: rgba(255,255,255,0.5);">45 Dateien</div>
+            </div>
+            <div style="padding: 24px; background: rgba(255,255,255,0.05); border-radius: 12px; text-align: center; cursor: pointer;">
+                <div style="font-size: 40px; margin-bottom: 8px;">🧾</div>
+                <div>Rechnungen</div>
+                <div style="font-size: 12px; color: rgba(255,255,255,0.5);">128 Dateien</div>
+            </div>
+            <div style="padding: 24px; background: rgba(255,255,255,0.05); border-radius: 12px; text-align: center; cursor: pointer;">
+                <div style="font-size: 40px; margin-bottom: 8px;">🏗️</div>
+                <div>Projekte</div>
+                <div style="font-size: 12px; color: rgba(255,255,255,0.5);">67 Dateien</div>
+            </div>
+        </div>
+    </div>
+    {% endblock %}
+    '''
+    return render_template_string(BASE_TEMPLATE + content, 
+                                  title="Private Locker", 
+                                  active_page="locker")
+
+@app.route('/dashboard/projects')
+@login_required
+def projects():
+    content = '''
+    {% extends "base" %}
+    {% block content %}
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">🏗️ Projekte</h1>
+            <p class="page-subtitle">Aktive Bauprojekte & Smart Home Installationen</p>
+        </div>
+        <button class="btn btn-primary">➕ Neues Projekt</button>
+    </div>
+    
+    <div class="card">
+        <p style="text-align: center; padding: 60px; color: rgba(255,255,255,0.6);">
+            <span style="font-size: 48px; display: block; margin-bottom: 16px;">🏗️</span>
+            Projektmanagement-Modul wird geladen...
+        </p>
+    </div>
+    {% endblock %}
+    '''
+    return render_template_string(BASE_TEMPLATE + content, 
+                                  title="Projekte", 
+                                  active_page="projects")
+
+# ============================================================================
+# API ENDPOINTS
+# ============================================================================
+@app.route('/api/v1/leads')
 def api_leads():
-    if request.method == 'POST':
-        data = request.get_json()
-        lead = Lead(title=data.get('title'), contact_name=data.get('contact_name'), company=data.get('company'), value=data.get('value', 0), status=data.get('status', 'new'), priority=data.get('priority', 'medium'), source=data.get('source'), notes=data.get('notes'), assigned_to=session.get('user_id'))
-        db.session.add(lead)
-        db.session.commit()
-        return jsonify({'success': True, 'lead': lead.to_dict()})
-    leads = Lead.query.order_by(Lead.created_at.desc()).all()
-    return jsonify({'success': True, 'leads': [l.to_dict() for l in leads]})
+    return jsonify({"success": True, "data": LEADS_DATA, "count": len(LEADS_DATA)})
 
-@app.route('/api/leads/<int:id>', methods=['GET', 'PUT', 'DELETE'])
-@login_required
-def api_lead(id):
-    lead = Lead.query.get_or_404(id)
-    if request.method == 'DELETE':
-        db.session.delete(lead)
-        db.session.commit()
-        return jsonify({'success': True})
-    if request.method == 'PUT':
-        data = request.get_json()
-        old_status = lead.status
-        lead.title = data.get('title', lead.title)
-        lead.contact_name = data.get('contact_name', lead.contact_name)
-        lead.company = data.get('company', lead.company)
-        lead.value = data.get('value', lead.value)
-        lead.status = data.get('status', lead.status)
-        lead.priority = data.get('priority', lead.priority)
-        lead.notes = data.get('notes', lead.notes)
-        db.session.commit()
-        if lead.status == 'won' and old_status != 'won':
-            award_tokens(session.get('user_id'), 'god', 50, f'Lead gewonnen: {lead.title}')
-        return jsonify({'success': True, 'lead': lead.to_dict()})
-    return jsonify({'success': True, 'lead': lead.to_dict()})
+@app.route('/api/v1/predictions')
+def api_predictions():
+    return jsonify({"success": True, "data": EINSTEIN_PREDICTIONS})
 
-# Campaigns API
-@app.route('/api/campaigns', methods=['GET', 'POST'])
-@login_required
-def api_campaigns():
-    if request.method == 'POST':
-        data = request.get_json()
-        campaign = Campaign(name=data.get('name'), type=data.get('type', 'whatsapp'), template=data.get('template'), user_id=session.get('user_id'))
-        db.session.add(campaign)
-        db.session.commit()
-        return jsonify({'success': True, 'campaign': campaign.to_dict()})
-    campaigns = Campaign.query.order_by(Campaign.created_at.desc()).all()
-    return jsonify({'success': True, 'campaigns': [c.to_dict() for c in campaigns]})
+@app.route('/api/v1/security/status')
+def api_security():
+    return jsonify({"success": True, "data": DEDSEC_SYSTEMS})
 
-# Invoices API
-@app.route('/api/invoices', methods=['GET', 'POST'])
-@login_required
-def api_invoices():
-    if request.method == 'POST':
-        data = request.get_json()
-        invoice = Invoice(invoice_number=generate_invoice_number(), contact_name=data.get('contact_name'), contact_email=data.get('contact_email'), total=data.get('total', 0), status='draft', user_id=session.get('user_id'))
-        invoice.subtotal = invoice.total / 1.19
-        invoice.tax_amount = invoice.total - invoice.subtotal
-        db.session.add(invoice)
-        db.session.commit()
-        return jsonify({'success': True, 'invoice': invoice.to_dict()})
-    invoices = Invoice.query.order_by(Invoice.created_at.desc()).all()
-    return jsonify({'success': True, 'invoices': [i.to_dict() for i in invoices]})
-
-# Tasks API
-@app.route('/api/tasks', methods=['GET', 'POST'])
-@login_required
-def api_tasks():
-    if request.method == 'POST':
-        data = request.get_json()
-        task = Task(title=data.get('title'), description=data.get('description'), category=data.get('category'), assigned_bot=data.get('assigned_bot'), assigned_to=session.get('user_id'))
-        db.session.add(task)
-        db.session.commit()
-        return jsonify({'success': True, 'task': task.to_dict()})
-    tasks = Task.query.order_by(Task.created_at.desc()).all()
-    return jsonify({'success': True, 'tasks': [t.to_dict() for t in tasks]})
-
-# Automations API
-@app.route('/api/automations', methods=['GET', 'POST'])
-@login_required
-def api_automations():
-    if request.method == 'POST':
-        data = request.get_json()
-        automation = Automation(name=data.get('name'), trigger_type=data.get('trigger_type'), action_type=data.get('action_type'), user_id=session.get('user_id'))
-        db.session.add(automation)
-        db.session.commit()
-        return jsonify({'success': True, 'automation': automation.to_dict()})
-    automations = Automation.query.filter_by(user_id=session.get('user_id')).all()
-    return jsonify({'success': True, 'automations': [a.to_dict() for a in automations]})
-
-@app.route('/api/automations/<int:id>/toggle', methods=['POST'])
-@login_required
-def api_toggle_automation(id):
-    automation = Automation.query.get_or_404(id)
-    automation.is_active = not automation.is_active
-    db.session.commit()
-    return jsonify({'success': True, 'is_active': automation.is_active})
-
-# AI Chat API
-@app.route('/api/ai/chat', methods=['POST'])
-@login_required
-def api_ai_chat():
-    data = request.get_json()
-    message = data.get('message', '').strip()
-    if not message:
-        return jsonify({'success': False, 'error': 'Keine Nachricht'})
-    user_id = session.get('user_id')
-    user_msg = ChatHistory(user_id=user_id, role='user', content=message)
-    db.session.add(user_msg)
-    db.session.commit()
-    api_key = get_env_var('ANTHROPIC_API_KEY')
-    if not api_key or not api_key.startswith('sk-ant'):
-        response_text = f"AI ist nicht konfiguriert. Deine Nachricht war: {message}"
-    else:
-        try:
-            history = ChatHistory.query.filter_by(user_id=user_id).order_by(ChatHistory.created_at.desc()).limit(20).all()
-            history.reverse()
-            messages = [{"role": h.role, "content": h.content} for h in history]
-            res = requests.post('https://api.anthropic.com/v1/messages', headers={'x-api-key': api_key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json'}, json={'model': 'claude-sonnet-4-20250514', 'max_tokens': 2000, 'system': 'Du bist ein hilfreicher KI-Assistent für West Money OS, eine Business-Plattform. Antworte auf Deutsch, präzise und freundlich.', 'messages': messages}, timeout=60)
-            if res.status_code == 200:
-                response_text = res.json()['content'][0]['text']
-            else:
-                response_text = f"API Fehler: {res.status_code}"
-        except Exception as e:
-            response_text = f"Fehler: {str(e)}"
-    assistant_msg = ChatHistory(user_id=user_id, role='assistant', content=response_text)
-    db.session.add(assistant_msg)
-    db.session.commit()
-    return jsonify({'success': True, 'response': response_text})
-
-@app.route('/api/ai/clear', methods=['POST'])
-@login_required
-def api_ai_clear():
-    ChatHistory.query.filter_by(user_id=session.get('user_id')).delete()
-    db.session.commit()
-    return jsonify({'success': True})
-
-# User Profile API
-@app.route('/api/user/profile', methods=['POST'])
-@login_required
-def api_user_profile():
-    user = get_current_user()
-    data = request.get_json()
-    user.name = data.get('name', user.name)
-    user.email = data.get('email', user.email)
-    if data.get('password'):
-        user.set_password(data.get('password'))
-    db.session.commit()
-    return jsonify({'success': True})
-
-# Dashboard Stats API
-@app.route('/api/dashboard/stats')
-@login_required
-def api_dashboard_stats():
+@app.route('/api/v1/health')
+def api_health():
     return jsonify({
-        'success': True,
-        'contacts': Contact.query.count(),
-        'leads': Lead.query.count(),
-        'pipeline_value': db.session.query(db.func.sum(Lead.value)).scalar() or 0,
-        'tasks_pending': Task.query.filter_by(status='pending').count()
+        "status": "healthy",
+        "version": "13.0",
+        "timestamp": datetime.now().isoformat(),
+        "modules": {
+            "dashboard": "online",
+            "einstein": "online",
+            "dedsec": "online",
+            "whatsapp": "online",
+            "godbot": "online",
+            "locker": "online"
+        }
     })
 
-# Health Check
-@app.route('/api/health')
-def api_health():
-    return jsonify({'status': 'healthy', 'version': '11.0.0-GODMODE-ULTIMATE', 'timestamp': datetime.utcnow().isoformat()})
-
-# =============================================================================
-# ERROR HANDLERS
-# =============================================================================
-@app.errorhandler(404)
-def not_found(e):
-    return redirect('/')
-
-@app.errorhandler(500)
-def server_error(e):
-    return jsonify({'success': False, 'error': 'Interner Serverfehler'}), 500
-
-# =============================================================================
-# INITIALIZE
-# =============================================================================
-with app.app_context():
-    db.create_all()
-    if not User.query.filter_by(username='admin').first():
-        admin = User(username='admin', email='admin@west-money.com', name='Administrator', role='admin', plan='enterprise', tokens_god=1000, tokens_dedsec=500, tokens_og=250, tokens_tower=100)
-        admin.set_password('663724')
-        db.session.add(admin)
-        db.session.commit()
-    logger.info("✅ West Money OS v11.0 GODMODE ULTIMATE initialized")
-
+# ============================================================================
+# MAIN
+# ============================================================================
 if __name__ == '__main__':
-    print("🚀 West Money OS v11.0 GODMODE ULTIMATE starting...")
     app.run(host='0.0.0.0', port=5000, debug=False)
