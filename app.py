@@ -3857,6 +3857,782 @@ def logout():
     return redirect('/')
 
 
+
+# =============================================================================
+# CONTACTS API
+# =============================================================================
+
+@app.route('/api/contacts', methods=['GET'])
+@login_required
+def get_contacts():
+    """Get all contacts"""
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 50, type=int)
+    search = request.args.get('search', '')
+    
+    query = Contact.query
+    if search:
+        query = query.filter(
+            (Contact.name.ilike(f'%{search}%')) |
+            (Contact.email.ilike(f'%{search}%')) |
+            (Contact.phone.ilike(f'%{search}%'))
+        )
+    
+    contacts = query.order_by(Contact.created_at.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    
+    return jsonify({
+        'success': True,
+        'contacts': [c.to_dict() for c in contacts.items],
+        'total': contacts.total,
+        'pages': contacts.pages,
+        'current_page': page
+    })
+
+
+@app.route('/api/contacts', methods=['POST'])
+@login_required
+def create_contact():
+    """Create new contact"""
+    data = request.get_json()
+    
+    contact = Contact(
+        name=data.get('name'),
+        email=data.get('email'),
+        phone=data.get('phone'),
+        company=data.get('company'),
+        whatsapp_consent=data.get('whatsapp_consent', False),
+        tags=json.dumps(data.get('tags', [])),
+        notes=data.get('notes'),
+        user_id=session.get('user_id')
+    )
+    
+    db.session.add(contact)
+    db.session.commit()
+    
+    # Sync to HubSpot if configured
+    if config.HUBSPOT_API_KEY:
+        try:
+            HubSpotService.create_or_update_contact(contact)
+        except:
+            pass
+    
+    return jsonify({'success': True, 'contact': contact.to_dict()}), 201
+
+
+@app.route('/api/contacts/<int:contact_id>', methods=['GET'])
+@login_required
+def get_contact(contact_id):
+    """Get single contact"""
+    contact = Contact.query.get_or_404(contact_id)
+    return jsonify({'success': True, 'contact': contact.to_dict()})
+
+
+@app.route('/api/contacts/<int:contact_id>', methods=['PUT'])
+@login_required
+def update_contact(contact_id):
+    """Update contact"""
+    contact = Contact.query.get_or_404(contact_id)
+    data = request.get_json()
+    
+    for field in ['name', 'email', 'phone', 'company', 'whatsapp_consent', 'notes']:
+        if field in data:
+            setattr(contact, field, data[field])
+    
+    if 'tags' in data:
+        contact.tags = json.dumps(data['tags'])
+    
+    db.session.commit()
+    return jsonify({'success': True, 'contact': contact.to_dict()})
+
+
+@app.route('/api/contacts/<int:contact_id>', methods=['DELETE'])
+@login_required
+def delete_contact(contact_id):
+    """Delete contact"""
+    contact = Contact.query.get_or_404(contact_id)
+    db.session.delete(contact)
+    db.session.commit()
+    return jsonify({'success': True, 'message': 'Kontakt gelöscht'})
+
+
+@app.route('/api/contacts/bulk-consent', methods=['POST'])
+@login_required
+def bulk_update_consent():
+    """Bulk update WhatsApp consent"""
+    data = request.get_json()
+    contact_ids = data.get('contact_ids', [])
+    consent = data.get('consent', False)
+    
+    Contact.query.filter(Contact.id.in_(contact_ids)).update(
+        {'whatsapp_consent': consent}, synchronize_session=False
+    )
+    db.session.commit()
+    
+    return jsonify({'success': True, 'updated': len(contact_ids)})
+
+
+# =============================================================================
+# LEADS API
+# =============================================================================
+
+@app.route('/api/leads', methods=['GET'])
+@login_required
+def get_leads():
+    """Get all leads"""
+    page = request.args.get('page', 1, type=int)
+    status = request.args.get('status', '')
+    
+    query = Lead.query
+    if status:
+        query = query.filter_by(status=status)
+    
+    leads = query.order_by(Lead.created_at.desc()).paginate(
+        page=page, per_page=50, error_out=False
+    )
+    
+    return jsonify({
+        'success': True,
+        'leads': [l.to_dict() for l in leads.items],
+        'total': leads.total
+    })
+
+
+@app.route('/api/leads', methods=['POST'])
+@login_required
+def create_lead():
+    """Create new lead"""
+    data = request.get_json()
+    
+    lead = Lead(
+        contact_id=data.get('contact_id'),
+        title=data.get('title'),
+        value=data.get('value', 0),
+        status=data.get('status', 'new'),
+        source=data.get('source'),
+        notes=data.get('notes'),
+        assigned_to=data.get('assigned_to', session.get('user_id'))
+    )
+    
+    db.session.add(lead)
+    db.session.commit()
+    
+    return jsonify({'success': True, 'lead': lead.to_dict()}), 201
+
+
+@app.route('/api/leads/<int:lead_id>', methods=['GET'])
+@login_required
+def get_lead(lead_id):
+    """Get single lead"""
+    lead = Lead.query.get_or_404(lead_id)
+    return jsonify({'success': True, 'lead': lead.to_dict()})
+
+
+@app.route('/api/leads/<int:lead_id>', methods=['PUT'])
+@login_required
+def update_lead(lead_id):
+    """Update lead"""
+    lead = Lead.query.get_or_404(lead_id)
+    data = request.get_json()
+    
+    for field in ['title', 'value', 'status', 'source', 'notes', 'assigned_to']:
+        if field in data:
+            setattr(lead, field, data[field])
+    
+    db.session.commit()
+    return jsonify({'success': True, 'lead': lead.to_dict()})
+
+
+@app.route('/api/leads/<int:lead_id>', methods=['DELETE'])
+@login_required
+def delete_lead(lead_id):
+    """Delete lead"""
+    lead = Lead.query.get_or_404(lead_id)
+    db.session.delete(lead)
+    db.session.commit()
+    return jsonify({'success': True, 'message': 'Lead gelöscht'})
+
+
+# =============================================================================
+# CAMPAIGNS API
+# =============================================================================
+
+@app.route('/api/campaigns', methods=['GET'])
+@login_required
+def get_campaigns():
+    """Get all campaigns"""
+    campaigns = Campaign.query.order_by(Campaign.created_at.desc()).all()
+    return jsonify({'success': True, 'campaigns': [c.to_dict() for c in campaigns]})
+
+
+@app.route('/api/campaigns', methods=['POST'])
+@login_required
+def create_campaign():
+    """Create new campaign"""
+    data = request.get_json()
+    
+    campaign = Campaign(
+        name=data.get('name'),
+        type=data.get('type', 'whatsapp'),
+        template_id=data.get('template_id'),
+        target_segment=data.get('target_segment'),
+        scheduled_at=datetime.fromisoformat(data['scheduled_at']) if data.get('scheduled_at') else None,
+        status='draft',
+        created_by=session.get('user_id')
+    )
+    
+    db.session.add(campaign)
+    db.session.commit()
+    
+    return jsonify({'success': True, 'campaign': campaign.to_dict()}), 201
+
+
+@app.route('/api/campaigns/<int:campaign_id>/send', methods=['POST'])
+@login_required
+def send_campaign(campaign_id):
+    """Send campaign"""
+    campaign = Campaign.query.get_or_404(campaign_id)
+    
+    # Get target contacts
+    contacts = Contact.query.filter_by(whatsapp_consent=True).all()
+    
+    sent_count = 0
+    for contact in contacts:
+        if contact.phone:
+            # Send via WhatsApp
+            try:
+                WhatsAppService.send_template_message(
+                    contact.phone,
+                    campaign.template_id
+                )
+                sent_count += 1
+            except:
+                pass
+    
+    campaign.status = 'sent'
+    campaign.sent_count = sent_count
+    campaign.sent_at = datetime.utcnow()
+    db.session.commit()
+    
+    return jsonify({'success': True, 'sent_count': sent_count})
+
+
+# =============================================================================
+# TASKS API
+# =============================================================================
+
+@app.route('/api/tasks', methods=['GET'])
+@login_required
+def get_tasks():
+    """Get all tasks"""
+    status = request.args.get('status', '')
+    
+    query = Task.query.filter_by(assigned_to=session.get('user_id'))
+    if status:
+        query = query.filter_by(status=status)
+    
+    tasks = query.order_by(Task.due_date.asc()).all()
+    return jsonify({'success': True, 'tasks': [t.to_dict() for t in tasks]})
+
+
+@app.route('/api/tasks', methods=['POST'])
+@login_required
+def create_task():
+    """Create new task"""
+    data = request.get_json()
+    
+    task = Task(
+        title=data.get('title'),
+        description=data.get('description'),
+        due_date=datetime.fromisoformat(data['due_date']) if data.get('due_date') else None,
+        priority=data.get('priority', 'medium'),
+        status='pending',
+        assigned_to=data.get('assigned_to', session.get('user_id')),
+        related_lead_id=data.get('lead_id'),
+        related_contact_id=data.get('contact_id')
+    )
+    
+    db.session.add(task)
+    db.session.commit()
+    
+    return jsonify({'success': True, 'task': task.to_dict()}), 201
+
+
+@app.route('/api/tasks/<int:task_id>', methods=['PUT'])
+@login_required
+def update_task(task_id):
+    """Update task"""
+    task = Task.query.get_or_404(task_id)
+    data = request.get_json()
+    
+    for field in ['title', 'description', 'priority', 'status']:
+        if field in data:
+            setattr(task, field, data[field])
+    
+    if 'due_date' in data:
+        task.due_date = datetime.fromisoformat(data['due_date']) if data['due_date'] else None
+    
+    if data.get('status') == 'completed':
+        task.completed_at = datetime.utcnow()
+    
+    db.session.commit()
+    return jsonify({'success': True, 'task': task.to_dict()})
+
+
+# =============================================================================
+# DASHBOARD API
+# =============================================================================
+
+@app.route('/api/dashboard/stats', methods=['GET'])
+@login_required
+def get_dashboard_stats():
+    """Get dashboard statistics"""
+    today = datetime.utcnow().date()
+    month_start = today.replace(day=1)
+    
+    stats = {
+        'contacts': {
+            'total': Contact.query.count(),
+            'this_month': Contact.query.filter(Contact.created_at >= month_start).count(),
+            'with_consent': Contact.query.filter_by(whatsapp_consent=True).count()
+        },
+        'leads': {
+            'total': Lead.query.count(),
+            'new': Lead.query.filter_by(status='new').count(),
+            'qualified': Lead.query.filter_by(status='qualified').count(),
+            'won': Lead.query.filter_by(status='won').count(),
+            'total_value': db.session.query(db.func.sum(Lead.value)).scalar() or 0
+        },
+        'tasks': {
+            'pending': Task.query.filter_by(status='pending', assigned_to=session.get('user_id')).count(),
+            'overdue': Task.query.filter(
+                Task.status == 'pending',
+                Task.due_date < datetime.utcnow()
+            ).count()
+        },
+        'messages': {
+            'total': Message.query.count(),
+            'today': Message.query.filter(Message.timestamp >= today).count()
+        }
+    }
+    
+    return jsonify({'success': True, 'stats': stats})
+
+
+@app.route('/api/dashboard/pipeline', methods=['GET'])
+@login_required
+def get_pipeline():
+    """Get sales pipeline"""
+    pipeline = {}
+    for status in ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'won', 'lost']:
+        leads = Lead.query.filter_by(status=status).all()
+        pipeline[status] = {
+            'count': len(leads),
+            'value': sum(l.value or 0 for l in leads),
+            'leads': [l.to_dict() for l in leads[:5]]
+        }
+    
+    return jsonify({'success': True, 'pipeline': pipeline})
+
+
+# =============================================================================
+# AI CHAT API
+# =============================================================================
+
+@app.route('/api/ai/chat', methods=['POST'])
+@login_required
+def ai_chat():
+    """AI Chat endpoint"""
+    data = request.get_json()
+    message = data.get('message', '')
+    session_id = data.get('session_id', str(uuid.uuid4()))
+    
+    if not config.ANTHROPIC_API_KEY:
+        return jsonify({'success': False, 'error': 'AI nicht konfiguriert'}), 503
+    
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
+        
+        response = client.messages.create(
+            model=config.CLAUDE_MODEL,
+            max_tokens=1024,
+            system="Du bist ein hilfreicher Assistent für West Money OS, eine Business-Plattform für Smart Home und CRM.",
+            messages=[{"role": "user", "content": message}]
+        )
+        
+        ai_response = response.content[0].text
+        
+        # Save to session
+        chat_session = AIChatSession.query.filter_by(session_id=session_id).first()
+        if not chat_session:
+            chat_session = AIChatSession(
+                session_id=session_id,
+                user_id=session.get('user_id')
+            )
+            db.session.add(chat_session)
+        
+        chat_session.messages = json.dumps(
+            json.loads(chat_session.messages or '[]') + [
+                {'role': 'user', 'content': message},
+                {'role': 'assistant', 'content': ai_response}
+            ]
+        )
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'response': ai_response,
+            'session_id': session_id
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/ai/analyze-lead', methods=['POST'])
+@login_required
+def analyze_lead():
+    """AI Lead Analysis"""
+    data = request.get_json()
+    lead_id = data.get('lead_id')
+    
+    lead = Lead.query.get_or_404(lead_id)
+    contact = Contact.query.get(lead.contact_id) if lead.contact_id else None
+    
+    if not config.ANTHROPIC_API_KEY:
+        return jsonify({'success': False, 'error': 'AI nicht konfiguriert'}), 503
+    
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
+        
+        prompt = f"""Analysiere diesen Lead:
+        Titel: {lead.title}
+        Wert: €{lead.value}
+        Status: {lead.status}
+        Quelle: {lead.source}
+        Kontakt: {contact.name if contact else 'N/A'}
+        Unternehmen: {contact.company if contact else 'N/A'}
+        
+        Gib eine kurze Empfehlung für die nächsten Schritte."""
+        
+        response = client.messages.create(
+            model=config.CLAUDE_MODEL,
+            max_tokens=500,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        
+        return jsonify({
+            'success': True,
+            'analysis': response.content[0].text
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# =============================================================================
+# WHATSAPP API
+# =============================================================================
+
+@app.route('/api/whatsapp/send', methods=['POST'])
+@login_required
+def send_whatsapp():
+    """Send WhatsApp message"""
+    data = request.get_json()
+    to = data.get('to')
+    message = data.get('message')
+    template_id = data.get('template_id')
+    
+    if not config.WHATSAPP_TOKEN:
+        return jsonify({'success': False, 'error': 'WhatsApp nicht konfiguriert'}), 503
+    
+    try:
+        if template_id:
+            result = WhatsAppService.send_template_message(to, template_id)
+        else:
+            result = WhatsAppService.send_text_message(to, message)
+        
+        # Log message
+        msg = Message(
+            contact_id=data.get('contact_id'),
+            direction='outgoing',
+            type='text',
+            content=message or f'Template: {template_id}',
+            status='sent',
+            whatsapp_message_id=result.get('messages', [{}])[0].get('id')
+        )
+        db.session.add(msg)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'result': result})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/whatsapp/templates', methods=['GET'])
+@login_required
+def get_whatsapp_templates():
+    """Get WhatsApp message templates"""
+    if not config.WHATSAPP_TOKEN:
+        return jsonify({'success': False, 'error': 'WhatsApp nicht konfiguriert'}), 503
+    
+    try:
+        templates = WhatsAppService.get_templates()
+        return jsonify({'success': True, 'templates': templates})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/whatsapp/messages/<int:contact_id>', methods=['GET'])
+@login_required
+def get_whatsapp_messages(contact_id):
+    """Get messages for contact"""
+    messages = Message.query.filter_by(contact_id=contact_id)\
+        .order_by(Message.timestamp.desc())\
+        .limit(100).all()
+    
+    return jsonify({
+        'success': True,
+        'messages': [m.to_dict() for m in messages]
+    })
+
+
+# =============================================================================
+# HUBSPOT API
+# =============================================================================
+
+@app.route('/api/hubspot/sync', methods=['POST'])
+@login_required
+def sync_hubspot():
+    """Sync with HubSpot"""
+    if not config.HUBSPOT_API_KEY:
+        return jsonify({'success': False, 'error': 'HubSpot nicht konfiguriert'}), 503
+    
+    try:
+        synced = 0
+        contacts = Contact.query.all()
+        
+        for contact in contacts:
+            try:
+                HubSpotService.create_or_update_contact(contact)
+                synced += 1
+            except:
+                pass
+        
+        return jsonify({'success': True, 'synced': synced})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/hubspot/search', methods=['GET'])
+@login_required
+def search_hubspot():
+    """Search HubSpot contacts"""
+    query = request.args.get('q', '')
+    
+    if not config.HUBSPOT_API_KEY:
+        return jsonify({'success': False, 'error': 'HubSpot nicht konfiguriert'}), 503
+    
+    try:
+        results = HubSpotService.search_contacts(query)
+        return jsonify({'success': True, 'results': results})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# =============================================================================
+# NOTIFICATIONS API
+# =============================================================================
+
+@app.route('/api/notifications', methods=['GET'])
+@login_required
+def get_notifications():
+    """Get user notifications"""
+    notifications = Notification.query.filter_by(
+        user_id=session.get('user_id')
+    ).order_by(Notification.created_at.desc()).limit(50).all()
+    
+    return jsonify({
+        'success': True,
+        'notifications': [n.to_dict() for n in notifications],
+        'unread': Notification.query.filter_by(
+            user_id=session.get('user_id'),
+            read=False
+        ).count()
+    })
+
+
+@app.route('/api/notifications/read', methods=['POST'])
+@login_required
+def mark_notifications_read():
+    """Mark notifications as read"""
+    data = request.get_json()
+    notification_ids = data.get('ids', [])
+    
+    if notification_ids:
+        Notification.query.filter(
+            Notification.id.in_(notification_ids)
+        ).update({'read': True}, synchronize_session=False)
+    else:
+        Notification.query.filter_by(
+            user_id=session.get('user_id')
+        ).update({'read': True}, synchronize_session=False)
+    
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+# =============================================================================
+# SECURITY API
+# =============================================================================
+
+@app.route('/api/security/events', methods=['GET'])
+@login_required
+@admin_required
+def get_security_events():
+    """Get security events"""
+    page = request.args.get('page', 1, type=int)
+    event_type = request.args.get('type', '')
+    
+    query = SecurityEvent.query
+    if event_type:
+        query = query.filter_by(event_type=event_type)
+    
+    events = query.order_by(SecurityEvent.timestamp.desc()).paginate(
+        page=page, per_page=100, error_out=False
+    )
+    
+    return jsonify({
+        'success': True,
+        'events': [e.to_dict() for e in events.items],
+        'total': events.total
+    })
+
+
+@app.route('/api/security/score', methods=['GET'])
+@login_required
+def get_security_score():
+    """Get security score"""
+    user = get_current_user()
+    
+    score = 100
+    issues = []
+    
+    # Check password age
+    if user.password_changed_at:
+        days_since_change = (datetime.utcnow() - user.password_changed_at).days
+        if days_since_change > 90:
+            score -= 20
+            issues.append('Passwort älter als 90 Tage')
+    
+    # Check 2FA
+    if not user.two_factor_enabled:
+        score -= 30
+        issues.append('Zwei-Faktor-Authentifizierung nicht aktiviert')
+    
+    # Check recent failed logins
+    recent_failures = SecurityEvent.query.filter(
+        SecurityEvent.event_type == 'failed_login',
+        SecurityEvent.timestamp > datetime.utcnow() - timedelta(hours=24)
+    ).count()
+    
+    if recent_failures > 5:
+        score -= 20
+        issues.append(f'{recent_failures} fehlgeschlagene Logins in 24h')
+    
+    return jsonify({
+        'success': True,
+        'score': max(0, score),
+        'issues': issues,
+        'recommendations': [
+            'Aktiviere Zwei-Faktor-Authentifizierung',
+            'Ändere dein Passwort regelmäßig',
+            'Überprüfe die Login-Aktivitäten'
+        ] if issues else []
+    })
+
+
+# =============================================================================
+# AUTH API
+# =============================================================================
+
+@app.route('/api/auth/register', methods=['POST'])
+def api_register():
+    """API Registration"""
+    data = request.get_json()
+    
+    # Check if user exists
+    if User.query.filter_by(email=data.get('email')).first():
+        return jsonify({'success': False, 'error': 'E-Mail bereits registriert'}), 400
+    
+    if User.query.filter_by(username=data.get('username')).first():
+        return jsonify({'success': False, 'error': 'Benutzername bereits vergeben'}), 400
+    
+    user = User(
+        username=data.get('username'),
+        email=data.get('email'),
+        name=data.get('name'),
+        plan='free'
+    )
+    user.set_password(data.get('password'))
+    
+    db.session.add(user)
+    db.session.commit()
+    
+    return jsonify({'success': True, 'user_id': user.id}), 201
+
+
+@app.route('/api/auth/login', methods=['POST'])
+def api_login():
+    """API Login"""
+    data = request.get_json()
+    username = data.get('username', '')
+    password = data.get('password', '')
+    
+    user = User.query.filter(
+        (User.username == username) | (User.email == username)
+    ).first()
+    
+    if user and user.check_password(password):
+        session['user_id'] = user.id
+        session.permanent = True
+        user.last_login = datetime.utcnow()
+        db.session.commit()
+        
+        log_security_event('login', 'info', {'user_id': user.id})
+        
+        return jsonify({
+            'success': True,
+            'user': user.to_dict(),
+            'token': secrets.token_hex(32)  # Simple token
+        })
+    
+    log_security_event('failed_login', 'warning', {'username': username})
+    return jsonify({'success': False, 'error': 'Ungültige Anmeldedaten'}), 401
+
+
+@app.route('/api/auth/logout', methods=['POST'])
+def api_logout():
+    """API Logout"""
+    if 'user_id' in session:
+        log_security_event('logout', 'info', {'user_id': session['user_id']})
+    session.clear()
+    return jsonify({'success': True})
+
+
+@app.route('/api/auth/me', methods=['GET'])
+@login_required
+def api_me():
+    """Get current user"""
+    user = get_current_user()
+    return jsonify({'success': True, 'user': user.to_dict()})
+
+
 @app.route('/api/health')
 def health_check():
     """API Health Check"""
