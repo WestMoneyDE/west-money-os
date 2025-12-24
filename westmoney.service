@@ -1,0 +1,16 @@
+[Unit]
+Description=West Money OS v15.369 - Enterprise Universe GmbH
+After=network.target
+
+[Service]
+User=administrator
+WorkingDirectory=/var/www/west-money-os
+Environment="PATH=/var/www/west-money-os/venv/bin"
+ExecStart=/var/www/west-money-os/venv/bin/python app.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

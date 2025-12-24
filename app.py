@@ -1,63 +1,222 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-WEST MONEY OS v13.0 - COMPLETE PLATFORM
-========================================
-Enterprise Universe GmbH
-CEO: Ömer Hüseyin Coşkun
-Launch: 01.01.2026
-
-Modules:
-- Dashboard & CRM
-- Einstein AI Agency
-- DedSec Security Ecosystem
-- WhatsApp Business
-- GOD BOT AI
-- Enterprise Hub
+╔══════════════════════════════════════════════════════════════════════════════╗
+║              WEST MONEY OS v15.369 - ULTIMATE EDITION                        ║
+║                    Enterprise Universe GmbH                                   ║
+║                  CEO: Ömer Hüseyin Coşkun                                    ║
+║                    Launch: 01.01.2026                                        ║
+╚══════════════════════════════════════════════════════════════════════════════╝
 """
 
-from flask import Flask, render_template_string, jsonify, request, redirect, url_for, session
+from flask import Flask, render_template_string, jsonify, request, redirect, url_for, session, flash, send_file
+from flask_cors import CORS
 from functools import wraps
-import json
-from datetime import datetime
-import os
+from datetime import datetime, timedelta
+from dotenv import load_dotenv
+import json, os, requests, hashlib, sqlite3, io
 
+load_dotenv()
+
+# ============================================================================
+# FLASK APP
+# ============================================================================
 app = Flask(__name__)
-app.secret_key = 'westmoney-godmode-2026-enterprise-universe'
+app.secret_key = os.getenv('SECRET_KEY', 'westmoney-godmode-v15-369-ultimate-2026')
+CORS(app)
 
 # ============================================================================
-# AUTHENTICATION
+# CONFIGURATION
 # ============================================================================
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not session.get('logged_in'):
-            return redirect(url_for('login'))
-        return f(*args, **kwargs)
-    return decorated_function
+CONFIG = {
+    'HUBSPOT_API_KEY': os.getenv('HUBSPOT_API_KEY', ''),
+    'STRIPE_SECRET_KEY': os.getenv('STRIPE_SECRET_KEY', ''),
+    'SEVDESK_API_KEY': os.getenv('SEVDESK_API_KEY', ''),
+    'ANTHROPIC_API_KEY': os.getenv('ANTHROPIC_API_KEY', ''),
+    'WHATSAPP_TOKEN': os.getenv('WHATSAPP_TOKEN', ''),
+    'WHATSAPP_PHONE_ID': os.getenv('WHATSAPP_PHONE_ID', ''),
+}
 
 # ============================================================================
-# SHARED DATA
+# DATABASE
 # ============================================================================
-CERTIFICATIONS = [
-    {"name": "ISO 9001:2015", "type": "quality", "icon": "🏅", "desc": "Qualitätsmanagement"},
-    {"name": "ISO 14001:2015", "type": "environment", "icon": "🌿", "desc": "Umweltmanagement"},
-    {"name": "ISO 27001:2022", "type": "security", "icon": "🔒", "desc": "Informationssicherheit"},
-    {"name": "ISO 45001:2018", "type": "safety", "icon": "⚡", "desc": "Arbeitsschutz"},
-    {"name": "DSGVO Konform", "type": "privacy", "icon": "🛡️", "desc": "EU-Datenschutz"},
-    {"name": "TÜV Rheinland", "type": "german", "icon": "✅", "desc": "Geprüfte Sicherheit"},
-    {"name": "LOXONE Platinum", "type": "partner", "icon": "🏠", "desc": "Smart Home Partner"},
-    {"name": "KNX Certified", "type": "partner", "icon": "🔌", "desc": "Bus-System Zertifiziert"},
-]
+def get_db():
+    conn = sqlite3.connect('westmoney.db')
+    conn.row_factory = sqlite3.Row
+    return conn
 
-AWARDS = [
-    {"name": "Top Smart Home Company 2024", "org": "Smart Home Awards", "icon": "🏆"},
-    {"name": "Innovation Award Rhein-Main", "org": "IHK Frankfurt", "icon": "💡"},
-    {"name": "Best PropTech Startup DACH", "org": "PropTech Summit", "icon": "🚀"},
-    {"name": "Digital Pioneer Award", "org": "Digitalverband", "icon": "⭐"},
-    {"name": "Green Building Excellence", "org": "DGNB", "icon": "🌱"},
-]
+def init_db():
+    conn = get_db()
+    c = conn.cursor()
+    
+    c.execute('''CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL, email TEXT, role TEXT DEFAULT 'user',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+    
+    c.execute('''CREATE TABLE IF NOT EXISTS contacts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, hubspot_id TEXT UNIQUE,
+        firstname TEXT, lastname TEXT, email TEXT, phone TEXT, company TEXT,
+        position TEXT, lead_status TEXT, whatsapp_consent TEXT DEFAULT 'unknown',
+        score INTEGER DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+    
+    c.execute('''CREATE TABLE IF NOT EXISTS deals (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, hubspot_id TEXT UNIQUE,
+        name TEXT, amount REAL DEFAULT 0, stage TEXT, contact_id INTEGER,
+        close_date DATE, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+    
+    c.execute('''CREATE TABLE IF NOT EXISTS projects (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, client TEXT,
+        description TEXT, status TEXT DEFAULT 'planning', progress INTEGER DEFAULT 0,
+        value REAL DEFAULT 0, project_type TEXT, location TEXT,
+        start_date DATE, end_date DATE, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+    
+    c.execute('''CREATE TABLE IF NOT EXISTS invoices (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, external_id TEXT, source TEXT,
+        contact_id INTEGER, amount REAL, status TEXT, due_date DATE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+    
+    c.execute('''CREATE TABLE IF NOT EXISTS documents (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
+        folder TEXT DEFAULT 'Dokumente', file_path TEXT, file_size INTEGER,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+    
+    c.execute('''CREATE TABLE IF NOT EXISTS activities (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT, description TEXT,
+        contact_id INTEGER, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+    
+    c.execute('''CREATE TABLE IF NOT EXISTS pv_projects (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, client TEXT,
+        kwp REAL, partner TEXT, status TEXT DEFAULT 'planning',
+        value REAL, location TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+    
+    # Default admin
+    admin_hash = hashlib.sha256('admin123'.encode()).hexdigest()
+    c.execute('INSERT OR IGNORE INTO users (username, password_hash, email, role) VALUES (?, ?, ?, ?)',
+              ('admin', admin_hash, 'admin@westmoney.de', 'admin'))
+    
+    # Sample projects
+    projects = [
+        ('Villa Müller - Smart Home', 'Familie Müller', 'active', 75, 185000, 'LOXONE', 'Frankfurt', '2024-09-15', '2025-02-28'),
+        ('Bürokomplex TechPark', 'TechCorp GmbH', 'active', 45, 420000, 'KNX', 'München', '2024-11-01', '2025-06-30'),
+        ('Penthouse Westend', 'Dr. Schmidt', 'planning', 15, 95000, 'LOXONE', 'Frankfurt', '2025-01-15', '2025-04-30'),
+        ('Mehrfamilienhaus Grünwald', 'Immobilien AG', 'active', 60, 380000, 'LOXONE', 'München', '2024-08-01', '2025-03-15'),
+        ('Smart Office Düsseldorf', 'FinanceHub', 'completed', 100, 156000, 'KNX', 'Düsseldorf', '2024-03-01', '2024-10-30'),
+        ('Wellness Center Spa', 'Wellness GmbH', 'active', 30, 245000, 'LOXONE', 'Baden-Baden', '2024-12-01', '2025-08-15'),
+    ]
+    for p in projects:
+        c.execute('INSERT OR IGNORE INTO projects (name,client,status,progress,value,project_type,location,start_date,end_date) SELECT ?,?,?,?,?,?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM projects WHERE name=?)', (*p, p[0]))
+    
+    conn.commit()
+    conn.close()
 
+# ============================================================================
+# API CLIENTS
+# ============================================================================
+class HubSpotAPI:
+    def __init__(self):
+        self.api_key = CONFIG['HUBSPOT_API_KEY']
+        self.base_url = 'https://api.hubapi.com'
+        self.headers = {'Authorization': f'Bearer {self.api_key}', 'Content-Type': 'application/json'}
+    
+    def get_contacts(self, limit=100):
+        if not self.api_key: return []
+        try:
+            r = requests.get(f'{self.base_url}/crm/v3/objects/contacts', headers=self.headers,
+                           params={'limit': limit, 'properties': 'firstname,lastname,email,phone,company,jobtitle,hs_lead_status,hs_whatsapp_consent'}, timeout=10)
+            return r.json().get('results', []) if r.ok else []
+        except: return []
+    
+    def get_deals(self, limit=100):
+        if not self.api_key: return []
+        try:
+            r = requests.get(f'{self.base_url}/crm/v3/objects/deals', headers=self.headers,
+                           params={'limit': limit, 'properties': 'dealname,amount,dealstage,closedate'}, timeout=10)
+            return r.json().get('results', []) if r.ok else []
+        except: return []
+    
+    def update_contact(self, contact_id, properties):
+        if not self.api_key: return False
+        try:
+            r = requests.patch(f'{self.base_url}/crm/v3/objects/contacts/{contact_id}',
+                             headers=self.headers, json={'properties': properties}, timeout=10)
+            return r.ok
+        except: return False
+    
+    def bulk_update_consent(self, contact_ids, status):
+        results = {'success': 0, 'failed': 0}
+        for cid in contact_ids:
+            if self.update_contact(cid, {'hs_whatsapp_consent': status}): results['success'] += 1
+            else: results['failed'] += 1
+        return results
+    
+    def sync_to_db(self):
+        contacts = self.get_contacts(500)
+        conn = get_db()
+        for c in contacts:
+            p = c.get('properties', {})
+            conn.execute('INSERT OR REPLACE INTO contacts (hubspot_id,firstname,lastname,email,phone,company,position,lead_status,whatsapp_consent) VALUES (?,?,?,?,?,?,?,?,?)',
+                        (c.get('id'), p.get('firstname',''), p.get('lastname',''), p.get('email',''), p.get('phone',''), p.get('company',''), p.get('jobtitle',''), p.get('hs_lead_status',''), p.get('hs_whatsapp_consent','unknown')))
+        conn.commit()
+        conn.close()
+        return len(contacts)
+
+class StripeAPI:
+    def __init__(self):
+        self.api_key = CONFIG['STRIPE_SECRET_KEY']
+        self.headers = {'Authorization': f'Bearer {self.api_key}'}
+    
+    def get_balance(self):
+        if not self.api_key: return 0
+        try:
+            r = requests.get('https://api.stripe.com/v1/balance', headers=self.headers, timeout=10)
+            return next((b['amount']/100 for b in r.json().get('available', []) if b.get('currency') == 'eur'), 0)
+        except: return 0
+    
+    def get_revenue(self, limit=100):
+        if not self.api_key: return 0
+        try:
+            r = requests.get('https://api.stripe.com/v1/payment_intents', headers=self.headers, params={'limit': limit}, timeout=10)
+            return sum(p.get('amount', 0)/100 for p in r.json().get('data', []) if p.get('status') == 'succeeded')
+        except: return 0
+
+class SevDeskAPI:
+    def __init__(self):
+        self.api_key = CONFIG['SEVDESK_API_KEY']
+        self.headers = {'Authorization': self.api_key}
+    
+    def get_invoices(self, limit=100):
+        if not self.api_key: return []
+        try:
+            r = requests.get('https://my.sevdesk.de/api/v1/Invoice', headers=self.headers, params={'limit': limit}, timeout=10)
+            return r.json().get('objects', [])
+        except: return []
+    
+    def get_total(self):
+        return sum(float(i.get('sumGross', 0)) for i in self.get_invoices(500))
+
+class ClaudeAPI:
+    def __init__(self):
+        self.api_key = CONFIG['ANTHROPIC_API_KEY']
+        self.headers = {'x-api-key': self.api_key, 'Content-Type': 'application/json', 'anthropic-version': '2023-06-01'}
+    
+    def chat(self, message, system=None):
+        if not self.api_key: return "API Key nicht konfiguriert."
+        try:
+            data = {'model': 'claude-sonnet-4-20250514', 'max_tokens': 2048, 'messages': [{'role': 'user', 'content': message}]}
+            if system: data['system'] = system
+            r = requests.post('https://api.anthropic.com/v1/messages', headers=self.headers, json=data, timeout=60)
+            return r.json()['content'][0]['text'] if r.ok else f"Error: {r.status_code}"
+        except Exception as e: return f"Error: {e}"
+
+hubspot = HubSpotAPI()
+stripe_api = StripeAPI()
+sevdesk = SevDeskAPI()
+claude = ClaudeAPI()
+
+# ============================================================================
+# SAMPLE DATA
+# ============================================================================
 LEADS_DATA = [
     {"id": 1, "name": "Thomas Moser", "company": "Loxone Electronics", "position": "Gründer", "score": 96, "stage": "contacted", "value": 500000},
     {"id": 2, "name": "Martin Öller", "company": "Loxone Electronics", "position": "Gründer", "score": 96, "stage": "contacted", "value": 500000},
@@ -71,24 +230,41 @@ LEADS_DATA = [
     {"id": 10, "name": "Markus Fuhrmann", "company": "Gropyus", "position": "Gründer", "score": 90, "stage": "qualified", "value": 350000},
 ]
 
-EINSTEIN_PREDICTIONS = [
-    {"type": "lead_conversion", "prediction": "87% Wahrscheinlichkeit", "lead": "Thomas Moser", "confidence": 87},
-    {"type": "deal_close", "prediction": "Q1 2026 Abschluss", "lead": "Hofmann Bau AG", "confidence": 92},
-    {"type": "upsell", "prediction": "€150k zusätzlich möglich", "lead": "Mainova AG", "confidence": 78},
-    {"type": "churn_risk", "prediction": "Niedriges Risiko", "lead": "Smart Home Bayern", "confidence": 95},
-    {"type": "best_contact", "prediction": "Dienstag 10:00 Uhr", "lead": "Loxone Electronics", "confidence": 83},
+PREDICTIONS = [
+    {"type": "lead_conversion", "lead": "Thomas Moser", "prediction": "87% Wahrscheinlichkeit", "confidence": 87},
+    {"type": "deal_close", "lead": "Hofmann Bau AG", "prediction": "Q1 2026 Abschluss", "confidence": 92},
+    {"type": "upsell", "lead": "Mainova AG", "prediction": "€150k PV-Integration", "confidence": 78},
+    {"type": "churn_risk", "lead": "Smart Home Bayern", "prediction": "Niedriges Risiko", "confidence": 95},
+    {"type": "best_contact", "lead": "Loxone Electronics", "prediction": "Dienstag 10:00", "confidence": 83},
 ]
 
 DEDSEC_SYSTEMS = [
-    {"id": "tower-01", "name": "Command Tower Frankfurt", "status": "online", "alerts": 0, "cameras": 24},
-    {"id": "drone-01", "name": "Patrol Drone Alpha", "status": "active", "battery": 87, "location": "Sector A"},
-    {"id": "drone-02", "name": "Patrol Drone Beta", "status": "charging", "battery": 23, "location": "Base"},
-    {"id": "firewall-01", "name": "Cyber Shield Main", "status": "active", "blocked": 1247, "threats": 3},
-    {"id": "vault-01", "name": "Secure Vault Primary", "status": "locked", "files": 892, "encrypted": True},
+    {"name": "Command Tower Frankfurt", "status": "online", "details": "24 Cameras"},
+    {"name": "Patrol Drone Alpha", "status": "active", "details": "Battery: 87%"},
+    {"name": "Patrol Drone Beta", "status": "charging", "details": "Battery: 23%"},
+    {"name": "Cyber Shield Main", "status": "active", "details": "1247 blocked"},
+    {"name": "Secure Vault Primary", "status": "locked", "details": "892 files"},
+]
+
+PV_PARTNERS = [
+    {"name": "1Komma5°", "logo": "🌡️", "type": "Premium", "commission": "8%", "rating": 4.8, "url": "https://1komma5.com"},
+    {"name": "Enpal", "logo": "☀️", "type": "Strategic", "commission": "6%", "rating": 4.6, "url": "https://enpal.de"},
+    {"name": "Zolar", "logo": "⚡", "type": "Online", "commission": "5%", "rating": 4.5, "url": "https://zolar.de"},
+    {"name": "Solarwatt", "logo": "🔋", "type": "Premium", "commission": "7%", "rating": 4.9, "url": "https://solarwatt.de"},
 ]
 
 # ============================================================================
-# BASE TEMPLATE
+# AUTHENTICATION
+# ============================================================================
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get('logged_in'): return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated
+
+# ============================================================================
+# TEMPLATE SYSTEM
 # ============================================================================
 BASE_TEMPLATE = '''
 <!DOCTYPE html>
@@ -96,2173 +272,679 @@ BASE_TEMPLATE = '''
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ title }} | West Money OS</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <title>{{ title }} - West Money OS v15.369</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-            font-family: 'Inter', sans-serif; 
-            background: {{ bg_color|default('#0a0a0a') }}; 
-            color: {{ text_color|default('#ffffff') }}; 
-            min-height: 100vh;
-        }
-        
-        /* Sidebar */
-        .sidebar {
-            position: fixed;
-            left: 0;
-            top: 0;
-            width: 280px;
-            height: 100vh;
-            background: linear-gradient(180deg, #1a1a2e 0%, #0f0f1a 100%);
-            border-right: 1px solid rgba(255,255,255,0.1);
-            padding: 20px;
-            overflow-y: auto;
-            z-index: 1000;
-        }
-        
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 20px 0;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            margin-bottom: 20px;
-        }
-        
-        .logo-icon {
-            width: 48px;
-            height: 48px;
-            background: linear-gradient(135deg, #FF5722, #FF9800);
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-        }
-        
-        .logo-text {
-            font-size: 20px;
-            font-weight: 700;
-            background: linear-gradient(90deg, #FF5722, #FFD700);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-        
-        .nav-section {
-            margin-bottom: 24px;
-        }
-        
-        .nav-section-title {
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: rgba(255,255,255,0.4);
-            margin-bottom: 12px;
-            padding-left: 12px;
-        }
-        
-        .nav-item {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 12px 16px;
-            border-radius: 10px;
-            color: rgba(255,255,255,0.7);
-            text-decoration: none;
-            transition: all 0.3s ease;
-            margin-bottom: 4px;
-        }
-        
-        .nav-item:hover, .nav-item.active {
-            background: rgba(255,87,34,0.15);
-            color: #FF5722;
-        }
-        
-        .nav-item.active {
-            background: linear-gradient(90deg, rgba(255,87,34,0.2), transparent);
-            border-left: 3px solid #FF5722;
-        }
-        
-        .nav-icon {
-            width: 20px;
-            text-align: center;
-        }
-        
-        /* Main Content */
-        .main-content {
-            margin-left: 280px;
-            padding: 30px;
-            min-height: 100vh;
-        }
-        
-        .page-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 30px;
-        }
-        
-        .page-title {
-            font-size: 28px;
-            font-weight: 700;
-        }
-        
-        .page-subtitle {
-            color: rgba(255,255,255,0.6);
-            margin-top: 4px;
-        }
-        
-        /* Cards */
-        .card {
-            background: rgba(255,255,255,0.05);
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 16px;
-            padding: 24px;
-            margin-bottom: 24px;
-        }
-        
-        .card-title {
-            font-size: 16px;
-            font-weight: 600;
-            margin-bottom: 16px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        
-        /* Stats Grid */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-        
-        .stat-card {
-            background: linear-gradient(135deg, rgba(255,87,34,0.1), rgba(255,152,0,0.05));
-            border: 1px solid rgba(255,87,34,0.2);
-            border-radius: 16px;
-            padding: 24px;
-        }
-        
-        .stat-value {
-            font-size: 32px;
-            font-weight: 700;
-            background: linear-gradient(90deg, #FF5722, #FFD700);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-        
-        .stat-label {
-            color: rgba(255,255,255,0.6);
-            margin-top: 4px;
-        }
-        
-        .stat-change {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            padding: 4px 8px;
-            border-radius: 20px;
-            font-size: 12px;
-            margin-top: 8px;
-        }
-        
-        .stat-change.positive {
-            background: rgba(76,175,80,0.2);
-            color: #4CAF50;
-        }
-        
-        .stat-change.negative {
-            background: rgba(244,67,54,0.2);
-            color: #F44336;
-        }
-        
-        /* Tables */
-        .table-container {
-            overflow-x: auto;
-        }
-        
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        
-        th, td {
-            padding: 14px 16px;
-            text-align: left;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-        }
-        
-        th {
-            font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: rgba(255,255,255,0.5);
-            font-weight: 500;
-        }
-        
-        tr:hover {
-            background: rgba(255,255,255,0.02);
-        }
-        
-        /* Badges */
-        .badge {
-            display: inline-flex;
-            align-items: center;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 500;
-        }
-        
+        body { font-family: 'Inter', sans-serif; background: #0a0a0a; color: #fff; min-height: 100vh; }
+        .sidebar { position: fixed; left: 0; top: 0; width: 250px; height: 100vh; background: linear-gradient(180deg, #1a1a2e, #0f0f1a); border-right: 1px solid rgba(255,255,255,0.1); padding: 16px; overflow-y: auto; z-index: 1000; }
+        .logo { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 16px; }
+        .logo-icon { width: 38px; height: 38px; background: linear-gradient(135deg, #FF5722, #FF9800); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+        .logo-text { font-size: 16px; font-weight: 700; background: linear-gradient(90deg, #FF5722, #FFD700); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .logo-version { font-size: 9px; color: rgba(255,255,255,0.4); }
+        .nav-section { margin-bottom: 16px; }
+        .nav-title { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,0.3); margin-bottom: 8px; padding-left: 10px; }
+        .nav-item { display: flex; align-items: center; gap: 8px; padding: 9px 10px; border-radius: 6px; color: rgba(255,255,255,0.7); text-decoration: none; font-size: 13px; transition: all 0.2s; margin-bottom: 2px; }
+        .nav-item:hover { background: rgba(255,87,34,0.1); color: #FF5722; }
+        .nav-item.active { background: linear-gradient(90deg, rgba(255,87,34,0.2), transparent); color: #FF5722; border-left: 2px solid #FF5722; }
+        .nav-icon { width: 16px; text-align: center; font-size: 12px; }
+        .main { margin-left: 250px; padding: 20px; min-height: 100vh; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .page-title { font-size: 22px; font-weight: 700; }
+        .page-sub { color: rgba(255,255,255,0.5); font-size: 12px; margin-top: 2px; }
+        .card { background: linear-gradient(135deg, #1a1a2e, #0f0f1a); border-radius: 10px; padding: 16px; border: 1px solid rgba(255,255,255,0.08); margin-bottom: 16px; }
+        .btn { padding: 8px 16px; border-radius: 6px; font-weight: 600; font-size: 12px; cursor: pointer; border: none; transition: all 0.2s; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; }
+        .btn-primary { background: linear-gradient(90deg, #FF5722, #FF9800); color: white; }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(255,87,34,0.4); }
+        .btn-secondary { background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2); }
+        .btn-success { background: #4CAF50; color: white; }
+        .btn-danger { background: #f44336; color: white; }
+        .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
+        .stat { background: linear-gradient(135deg, #1a1a2e, #16213e); border-radius: 10px; padding: 16px; border: 1px solid rgba(255,255,255,0.08); }
+        .stat-value { font-size: 26px; font-weight: 700; }
+        .stat-label { color: rgba(255,255,255,0.5); font-size: 11px; margin-top: 2px; }
+        .stat-change { font-size: 10px; margin-top: 2px; }
+        .stat-change.up { color: #4CAF50; }
+        .stat-change.down { color: #f44336; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: rgba(255,255,255,0.4); font-weight: 500; }
+        .badge { padding: 3px 8px; border-radius: 10px; font-size: 10px; font-weight: 500; }
         .badge-success { background: rgba(76,175,80,0.2); color: #4CAF50; }
         .badge-warning { background: rgba(255,152,0,0.2); color: #FF9800; }
-        .badge-danger { background: rgba(244,67,54,0.2); color: #F44336; }
+        .badge-danger { background: rgba(244,67,54,0.2); color: #f44336; }
         .badge-info { background: rgba(33,150,243,0.2); color: #2196F3; }
         .badge-purple { background: rgba(156,39,176,0.2); color: #9C27B0; }
-        
-        /* Buttons */
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 10px 20px;
-            border-radius: 10px;
-            font-weight: 500;
-            cursor: pointer;
-            border: none;
-            transition: all 0.3s ease;
-            text-decoration: none;
-        }
-        
-        .btn-primary {
-            background: linear-gradient(135deg, #FF5722, #FF9800);
-            color: white;
-        }
-        
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(255,87,34,0.4);
-        }
-        
-        .btn-secondary {
-            background: rgba(255,255,255,0.1);
-            color: white;
-            border: 1px solid rgba(255,255,255,0.2);
-        }
-        
-        /* Progress Bar */
-        .progress-bar {
-            height: 8px;
-            background: rgba(255,255,255,0.1);
-            border-radius: 4px;
-            overflow: hidden;
-        }
-        
-        .progress-fill {
-            height: 100%;
-            border-radius: 4px;
-            transition: width 0.5s ease;
-        }
-        
-        /* Score Badge */
-        .score-badge {
-            width: 48px;
-            height: 48px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            font-size: 14px;
-        }
-        
-        .score-high { background: linear-gradient(135deg, #4CAF50, #8BC34A); }
-        .score-medium { background: linear-gradient(135deg, #FF9800, #FFC107); }
-        .score-low { background: linear-gradient(135deg, #F44336, #E91E63); }
-        
-        /* Certifications Grid */
-        .cert-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 16px;
-        }
-        
-        .cert-card {
-            background: rgba(255,255,255,0.05);
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 12px;
-            padding: 20px;
-            text-align: center;
-            transition: all 0.3s ease;
-        }
-        
-        .cert-card:hover {
-            transform: translateY(-4px);
-            border-color: #FF5722;
-        }
-        
-        .cert-icon {
-            font-size: 32px;
-            margin-bottom: 12px;
-        }
-        
-        .cert-name {
-            font-weight: 600;
-            margin-bottom: 4px;
-        }
-        
-        .cert-desc {
-            font-size: 12px;
-            color: rgba(255,255,255,0.5);
-        }
-        
-        /* DedSec Theme */
-        .dedsec-glow {
-            text-shadow: 0 0 10px #00D4FF, 0 0 20px #00D4FF;
-        }
-        
-        .dedsec-card {
-            background: linear-gradient(135deg, rgba(0,212,255,0.1), rgba(0,255,65,0.05));
-            border: 1px solid rgba(0,212,255,0.3);
-        }
-        
-        /* Einstein Theme */
-        .einstein-card {
-            background: linear-gradient(135deg, rgba(156,39,176,0.1), rgba(103,58,183,0.05));
-            border: 1px solid rgba(156,39,176,0.3);
-        }
-        
-        /* Animations */
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-        
-        .pulse { animation: pulse 2s infinite; }
-        
-        @keyframes glow {
-            0%, 100% { box-shadow: 0 0 5px rgba(255,87,34,0.5); }
-            50% { box-shadow: 0 0 20px rgba(255,87,34,0.8); }
-        }
-        
-        .glow { animation: glow 2s infinite; }
-        
-        /* Responsive */
-        @media (max-width: 1024px) {
-            .sidebar { width: 80px; padding: 10px; }
-            .logo-text, .nav-text, .nav-section-title { display: none; }
-            .main-content { margin-left: 80px; }
-            .nav-item { justify-content: center; padding: 12px; }
-        }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+        .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+        input, select, textarea { width: 100%; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: white; font-size: 13px; }
+        input:focus, select:focus { outline: none; border-color: #FF5722; }
+        .progress { background: rgba(255,255,255,0.1); border-radius: 8px; height: 6px; overflow: hidden; }
+        .progress-bar { height: 100%; border-radius: 8px; background: linear-gradient(90deg, #FF5722, #FF9800); }
+        @media (max-width: 1200px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 768px) { .sidebar { width: 100%; height: auto; position: relative; } .main { margin-left: 0; } .stats { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
-    <!-- Sidebar -->
     <nav class="sidebar">
         <div class="logo">
-            <div class="logo-icon">⚡</div>
-            <div>
-                <div class="logo-text">West Money</div>
-                <div style="font-size: 10px; color: rgba(255,255,255,0.5);">OS v13.0</div>
-            </div>
+            <div class="logo-icon">🔥</div>
+            <div><div class="logo-text">West Money</div><div class="logo-version">OS v15.369</div></div>
         </div>
-        
         <div class="nav-section">
-            <div class="nav-section-title">Main</div>
-            <a href="/dashboard" class="nav-item {{ 'active' if active_page == 'dashboard' else '' }}">
-                <span class="nav-icon">📊</span>
-                <span class="nav-text">Dashboard</span>
-            </a>
-            <a href="/dashboard/leads" class="nav-item {{ 'active' if active_page == 'leads' else '' }}">
-                <span class="nav-icon">👥</span>
-                <span class="nav-text">Leads</span>
-            </a>
-            <a href="/dashboard/projects" class="nav-item {{ 'active' if active_page == 'projects' else '' }}">
-                <span class="nav-icon">🏗️</span>
-                <span class="nav-text">Projekte</span>
-            </a>
+            <div class="nav-title">Main</div>
+            <a href="/dashboard" class="nav-item {{ 'active' if active_page == 'dashboard' else '' }}"><span class="nav-icon">📊</span> Dashboard</a>
+            <a href="/leads" class="nav-item {{ 'active' if active_page == 'leads' else '' }}"><span class="nav-icon">🎯</span> Leads</a>
+            <a href="/contacts" class="nav-item {{ 'active' if active_page == 'contacts' else '' }}"><span class="nav-icon">👥</span> Kontakte</a>
+            <a href="/projects" class="nav-item {{ 'active' if active_page == 'projects' else '' }}"><span class="nav-icon">🏗️</span> Projekte</a>
+            <a href="/invoices" class="nav-item {{ 'active' if active_page == 'invoices' else '' }}"><span class="nav-icon">💰</span> Rechnungen</a>
         </div>
-        
         <div class="nav-section">
-            <div class="nav-section-title">Einstein AI</div>
-            <a href="/einstein" class="nav-item {{ 'active' if active_page == 'einstein' else '' }}">
-                <span class="nav-icon">🧠</span>
-                <span class="nav-text">Einstein Home</span>
-            </a>
-            <a href="/einstein/predictions" class="nav-item {{ 'active' if active_page == 'predictions' else '' }}">
-                <span class="nav-icon">🔮</span>
-                <span class="nav-text">Predictions</span>
-            </a>
-            <a href="/einstein/analytics" class="nav-item {{ 'active' if active_page == 'analytics' else '' }}">
-                <span class="nav-icon">📈</span>
-                <span class="nav-text">Analytics</span>
-            </a>
-            <a href="/einstein/insights" class="nav-item {{ 'active' if active_page == 'insights' else '' }}">
-                <span class="nav-icon">💡</span>
-                <span class="nav-text">Insights</span>
-            </a>
+            <div class="nav-title">Einstein AI</div>
+            <a href="/einstein" class="nav-item {{ 'active' if active_page == 'einstein' else '' }}"><span class="nav-icon">🧠</span> Einstein Home</a>
+            <a href="/einstein/predictions" class="nav-item {{ 'active' if active_page == 'predictions' else '' }}"><span class="nav-icon">🔮</span> Predictions</a>
+            <a href="/einstein/analytics" class="nav-item {{ 'active' if active_page == 'analytics' else '' }}"><span class="nav-icon">📈</span> Analytics</a>
+            <a href="/einstein/insights" class="nav-item {{ 'active' if active_page == 'insights' else '' }}"><span class="nav-icon">💡</span> Insights</a>
         </div>
-        
         <div class="nav-section">
-            <div class="nav-section-title">DedSec Security</div>
-            <a href="/dedsec" class="nav-item {{ 'active' if active_page == 'dedsec' else '' }}">
-                <span class="nav-icon">🛡️</span>
-                <span class="nav-text">Security Hub</span>
-            </a>
-            <a href="/dedsec/tower" class="nav-item {{ 'active' if active_page == 'tower' else '' }}">
-                <span class="nav-icon">🗼</span>
-                <span class="nav-text">Tower</span>
-            </a>
-            <a href="/dedsec/drones" class="nav-item {{ 'active' if active_page == 'drones' else '' }}">
-                <span class="nav-icon">🚁</span>
-                <span class="nav-text">Drones</span>
-            </a>
-            <a href="/dedsec/cctv" class="nav-item {{ 'active' if active_page == 'cctv' else '' }}">
-                <span class="nav-icon">📹</span>
-                <span class="nav-text">CCTV</span>
-            </a>
+            <div class="nav-title">Photovoltaik</div>
+            <a href="/pv" class="nav-item {{ 'active' if active_page == 'pv' else '' }}"><span class="nav-icon">☀️</span> PV Home</a>
+            <a href="/pv/partners" class="nav-item {{ 'active' if active_page == 'pv_partners' else '' }}"><span class="nav-icon">🤝</span> Partner</a>
+            <a href="/pv/calculator" class="nav-item {{ 'active' if active_page == 'pv_calc' else '' }}"><span class="nav-icon">🧮</span> PV Rechner</a>
         </div>
-        
         <div class="nav-section">
-            <div class="nav-section-title">Tools</div>
-            <a href="/whatsapp" class="nav-item {{ 'active' if active_page == 'whatsapp' else '' }}">
-                <span class="nav-icon">💬</span>
-                <span class="nav-text">WhatsApp</span>
-            </a>
-            <a href="/godbot" class="nav-item {{ 'active' if active_page == 'godbot' else '' }}">
-                <span class="nav-icon">🤖</span>
-                <span class="nav-text">GOD BOT</span>
-            </a>
-            <a href="/locker" class="nav-item {{ 'active' if active_page == 'locker' else '' }}">
-                <span class="nav-icon">🔐</span>
-                <span class="nav-text">Locker</span>
-            </a>
+            <div class="nav-title">DedSec Security</div>
+            <a href="/dedsec" class="nav-item {{ 'active' if active_page == 'dedsec' else '' }}"><span class="nav-icon">🛡️</span> Security Hub</a>
+            <a href="/dedsec/tower" class="nav-item {{ 'active' if active_page == 'tower' else '' }}"><span class="nav-icon">🗼</span> Tower</a>
+            <a href="/dedsec/drones" class="nav-item {{ 'active' if active_page == 'drones' else '' }}"><span class="nav-icon">🚁</span> Drones</a>
+            <a href="/dedsec/cctv" class="nav-item {{ 'active' if active_page == 'cctv' else '' }}"><span class="nav-icon">📹</span> CCTV</a>
         </div>
-        
-        <div class="nav-section" style="margin-top: auto; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1);">
-            <a href="/logout" class="nav-item">
-                <span class="nav-icon">🚪</span>
-                <span class="nav-text">Logout</span>
-            </a>
+        <div class="nav-section">
+            <div class="nav-title">Tools</div>
+            <a href="/whatsapp" class="nav-item {{ 'active' if active_page == 'whatsapp' else '' }}"><span class="nav-icon">💬</span> WhatsApp</a>
+            <a href="/whatsapp/consent" class="nav-item {{ 'active' if active_page == 'consent' else '' }}"><span class="nav-icon">✅</span> Consent</a>
+            <a href="/godbot" class="nav-item {{ 'active' if active_page == 'godbot' else '' }}"><span class="nav-icon">🤖</span> GOD BOT</a>
+            <a href="/locker" class="nav-item {{ 'active' if active_page == 'locker' else '' }}"><span class="nav-icon">🔐</span> Locker</a>
+        </div>
+        <div class="nav-section">
+            <div class="nav-title">System</div>
+            <a href="/settings" class="nav-item {{ 'active' if active_page == 'settings' else '' }}"><span class="nav-icon">⚙️</span> Settings</a>
+            <a href="/sync" class="nav-item {{ 'active' if active_page == 'sync' else '' }}"><span class="nav-icon">🔄</span> API Sync</a>
+            <a href="/logout" class="nav-item"><span class="nav-icon">🚪</span> Logout</a>
         </div>
     </nav>
-    
-    <!-- Main Content -->
-    <main class="main-content">
-        {% block content %}{% endblock %}
-    </main>
-    
-    <script>
-        // Global JS utilities
-        function formatCurrency(value) {
-            return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(value);
-        }
-        
-        function formatNumber(value) {
-            return new Intl.NumberFormat('de-DE').format(value);
-        }
-    </script>
+    <main class="main">{{ content|safe }}</main>
 </body>
 </html>
 '''
 
+def render_page(content, **kwargs):
+    rendered = render_template_string(content, **kwargs)
+    return render_template_string(BASE_TEMPLATE, content=rendered, **kwargs)
+
 # ============================================================================
-# ROUTES - AUTHENTICATION
+# AUTH ROUTES
 # ============================================================================
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
-        if username == 'admin' and password == '663724':
+        password_hash = hashlib.sha256(password.encode()).hexdigest()
+        conn = get_db()
+        user = conn.execute('SELECT * FROM users WHERE username=? AND password_hash=?', (username, password_hash)).fetchone()
+        conn.close()
+        if user:
             session['logged_in'] = True
-            session['user'] = 'Ömer Hüseyin Coşkun'
-            return redirect('/dashboard')
-    
+            session['user_id'] = user['id']
+            session['username'] = user['username']
+            session['role'] = user['role']
+            return redirect(url_for('dashboard'))
+        flash('Ungültige Anmeldedaten', 'error')
     return render_template_string('''
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Login | West Money OS</title>
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-        <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            body {
-                font-family: 'Inter', sans-serif;
-                background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
-                min-height: 100vh;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            }
-            .login-card {
-                background: rgba(255,255,255,0.05);
-                border: 1px solid rgba(255,255,255,0.1);
-                border-radius: 24px;
-                padding: 48px;
-                width: 100%;
-                max-width: 420px;
-                backdrop-filter: blur(10px);
-            }
-            .logo {
-                text-align: center;
-                margin-bottom: 32px;
-            }
-            .logo-icon {
-                width: 80px;
-                height: 80px;
-                background: linear-gradient(135deg, #FF5722, #FF9800);
-                border-radius: 20px;
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 40px;
-                margin-bottom: 16px;
-            }
-            .logo-text {
-                font-size: 28px;
-                font-weight: 700;
-                background: linear-gradient(90deg, #FF5722, #FFD700);
-                -webkit-background-clip: text;
-                -webkit-text-fill-color: transparent;
-            }
-            .logo-sub {
-                color: rgba(255,255,255,0.5);
-                font-size: 14px;
-            }
-            .form-group {
-                margin-bottom: 20px;
-            }
-            label {
-                display: block;
-                color: rgba(255,255,255,0.7);
-                margin-bottom: 8px;
-                font-size: 14px;
-            }
-            input {
-                width: 100%;
-                padding: 14px 16px;
-                background: rgba(255,255,255,0.05);
-                border: 1px solid rgba(255,255,255,0.2);
-                border-radius: 12px;
-                color: white;
-                font-size: 16px;
-                transition: all 0.3s ease;
-            }
-            input:focus {
-                outline: none;
-                border-color: #FF5722;
-                background: rgba(255,87,34,0.1);
-            }
-            button {
-                width: 100%;
-                padding: 16px;
-                background: linear-gradient(135deg, #FF5722, #FF9800);
-                border: none;
-                border-radius: 12px;
-                color: white;
-                font-size: 16px;
-                font-weight: 600;
-                cursor: pointer;
-                transition: all 0.3s ease;
-            }
-            button:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 10px 30px rgba(255,87,34,0.4);
-            }
-            .divider {
-                display: flex;
-                align-items: center;
-                margin: 24px 0;
-                color: rgba(255,255,255,0.3);
-                font-size: 12px;
-            }
-            .divider::before, .divider::after {
-                content: '';
-                flex: 1;
-                height: 1px;
-                background: rgba(255,255,255,0.1);
-            }
-            .divider span { padding: 0 16px; }
-            .certs {
-                display: flex;
-                justify-content: center;
-                gap: 16px;
-                margin-top: 24px;
-            }
-            .cert {
-                font-size: 24px;
-                opacity: 0.5;
-            }
-        </style>
-    </head>
-    <body>
-        <div class="login-card">
-            <div class="logo">
-                <div class="logo-icon">⚡</div>
-                <div class="logo-text">West Money OS</div>
-                <div class="logo-sub">Enterprise Universe GmbH</div>
-            </div>
-            
-            <form method="POST">
-                <div class="form-group">
-                    <label>Benutzername</label>
-                    <input type="text" name="username" placeholder="admin" required>
-                </div>
-                <div class="form-group">
-                    <label>Passwort</label>
-                    <input type="password" name="password" placeholder="••••••" required>
-                </div>
-                <button type="submit">🚀 Anmelden</button>
-            </form>
-            
-            <div class="divider"><span>Zertifiziert & Sicher</span></div>
-            
-            <div class="certs">
-                <span class="cert" title="ISO 27001">🔒</span>
-                <span class="cert" title="DSGVO">🛡️</span>
-                <span class="cert" title="TÜV">✅</span>
-                <span class="cert" title="SSL">🔐</span>
-            </div>
-        </div>
-    </body>
-    </html>
-    ''')
+    <!DOCTYPE html><html><head><title>Login - West Money OS</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Inter',sans-serif;background:linear-gradient(135deg,#0a0a0a,#1a1a2e);min-height:100vh;display:flex;align-items:center;justify-content:center}
+    .box{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:40px;width:100%;max-width:380px}
+    .logo{text-align:center;margin-bottom:30px}.logo-icon{font-size:48px;margin-bottom:10px}
+    .logo-text{font-size:24px;font-weight:700;background:linear-gradient(90deg,#FF5722,#FF9800);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .form-group{margin-bottom:20px}label{display:block;color:rgba(255,255,255,0.7);margin-bottom:8px;font-size:14px}
+    input{width:100%;padding:12px 16px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:white;font-size:14px}
+    input:focus{outline:none;border-color:#FF5722}
+    button{width:100%;padding:14px;background:linear-gradient(90deg,#FF5722,#FF9800);border:none;border-radius:8px;color:white;font-size:16px;font-weight:600;cursor:pointer}
+    button:hover{transform:translateY(-2px)}.version{text-align:center;margin-top:20px;color:rgba(255,255,255,0.3);font-size:12px}</style></head>
+    <body><div class="box"><div class="logo"><div class="logo-icon">💰</div><div class="logo-text">West Money OS</div></div>
+    <form method="POST"><div class="form-group"><label>Benutzername</label><input type="text" name="username" required placeholder="admin"></div>
+    <div class="form-group"><label>Passwort</label><input type="password" name="password" required placeholder="••••••••"></div>
+    <button type="submit">🔓 Anmelden</button></form><div class="version">v15.369 Ultimate Edition</div></div></body></html>''')
 
 @app.route('/logout')
 def logout():
     session.clear()
-    return redirect('/login')
+    return redirect(url_for('login'))
 
-# ============================================================================
-# ROUTES - LANDING PAGE
-# ============================================================================
 @app.route('/')
-def landing():
-    return render_template_string('''
-    <!DOCTYPE html>
-    <html lang="de">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>West Money Bau | Smart Home & Gebäudeautomation</title>
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-        <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            body {
-                font-family: 'Inter', sans-serif;
-                background: #0a0a0a;
-                color: #ffffff;
-                overflow-x: hidden;
-            }
-            
-            /* Hero Section */
-            .hero {
-                min-height: 100vh;
-                background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #0a0a0a 100%);
-                position: relative;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                text-align: center;
-                padding: 40px 20px;
-            }
-            
-            .hero::before {
-                content: '';
-                position: absolute;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="1" fill="rgba(255,87,34,0.1)"/></svg>');
-                background-size: 50px;
-                opacity: 0.5;
-            }
-            
-            .hero-content {
-                position: relative;
-                z-index: 1;
-                max-width: 900px;
-            }
-            
-            .hero-badge {
-                display: inline-flex;
-                align-items: center;
-                gap: 8px;
-                background: rgba(255,87,34,0.1);
-                border: 1px solid rgba(255,87,34,0.3);
-                padding: 8px 20px;
-                border-radius: 50px;
-                font-size: 14px;
-                margin-bottom: 32px;
-                color: #FF5722;
-            }
-            
-            .hero-title {
-                font-size: clamp(40px, 8vw, 80px);
-                font-weight: 800;
-                line-height: 1.1;
-                margin-bottom: 24px;
-            }
-            
-            .hero-title span {
-                background: linear-gradient(90deg, #FF5722, #FFD700, #FF5722);
-                background-size: 200% auto;
-                -webkit-background-clip: text;
-                -webkit-text-fill-color: transparent;
-                animation: gradient 3s ease infinite;
-            }
-            
-            @keyframes gradient {
-                0%, 100% { background-position: 0% center; }
-                50% { background-position: 100% center; }
-            }
-            
-            .hero-subtitle {
-                font-size: clamp(18px, 3vw, 24px);
-                color: rgba(255,255,255,0.7);
-                margin-bottom: 40px;
-                line-height: 1.6;
-            }
-            
-            .hero-buttons {
-                display: flex;
-                gap: 16px;
-                justify-content: center;
-                flex-wrap: wrap;
-            }
-            
-            .btn {
-                display: inline-flex;
-                align-items: center;
-                gap: 8px;
-                padding: 16px 32px;
-                border-radius: 12px;
-                font-weight: 600;
-                font-size: 16px;
-                text-decoration: none;
-                transition: all 0.3s ease;
-            }
-            
-            .btn-primary {
-                background: linear-gradient(135deg, #FF5722, #FF9800);
-                color: white;
-            }
-            
-            .btn-primary:hover {
-                transform: translateY(-4px);
-                box-shadow: 0 20px 40px rgba(255,87,34,0.4);
-            }
-            
-            .btn-secondary {
-                background: rgba(255,255,255,0.05);
-                border: 1px solid rgba(255,255,255,0.2);
-                color: white;
-            }
-            
-            .btn-secondary:hover {
-                background: rgba(255,255,255,0.1);
-            }
-            
-            /* Stats Section */
-            .stats {
-                display: grid;
-                grid-template-columns: repeat(4, 1fr);
-                gap: 2px;
-                background: rgba(255,255,255,0.1);
-                margin: 60px 0;
-            }
-            
-            .stat {
-                background: #0a0a0a;
-                padding: 40px 20px;
-                text-align: center;
-            }
-            
-            .stat-value {
-                font-size: 48px;
-                font-weight: 800;
-                background: linear-gradient(90deg, #FF5722, #FFD700);
-                -webkit-background-clip: text;
-                -webkit-text-fill-color: transparent;
-            }
-            
-            .stat-label {
-                color: rgba(255,255,255,0.6);
-                margin-top: 8px;
-            }
-            
-            /* Certifications Section */
-            .section {
-                padding: 100px 40px;
-                max-width: 1400px;
-                margin: 0 auto;
-            }
-            
-            .section-title {
-                font-size: 40px;
-                font-weight: 700;
-                text-align: center;
-                margin-bottom: 60px;
-            }
-            
-            .section-title span {
-                background: linear-gradient(90deg, #FF5722, #FFD700);
-                -webkit-background-clip: text;
-                -webkit-text-fill-color: transparent;
-            }
-            
-            .cert-grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-                gap: 24px;
-            }
-            
-            .cert-card {
-                background: rgba(255,255,255,0.03);
-                border: 1px solid rgba(255,255,255,0.1);
-                border-radius: 20px;
-                padding: 32px;
-                text-align: center;
-                transition: all 0.3s ease;
-            }
-            
-            .cert-card:hover {
-                transform: translateY(-8px);
-                border-color: #FF5722;
-                background: rgba(255,87,34,0.05);
-            }
-            
-            .cert-icon {
-                font-size: 48px;
-                margin-bottom: 16px;
-            }
-            
-            .cert-name {
-                font-size: 18px;
-                font-weight: 600;
-                margin-bottom: 8px;
-            }
-            
-            .cert-desc {
-                color: rgba(255,255,255,0.5);
-                font-size: 14px;
-            }
-            
-            /* Awards Section */
-            .awards-grid {
-                display: flex;
-                flex-wrap: wrap;
-                justify-content: center;
-                gap: 24px;
-            }
-            
-            .award-card {
-                background: linear-gradient(135deg, rgba(255,215,0,0.1), rgba(255,87,34,0.05));
-                border: 1px solid rgba(255,215,0,0.3);
-                border-radius: 16px;
-                padding: 24px 32px;
-                display: flex;
-                align-items: center;
-                gap: 16px;
-                transition: all 0.3s ease;
-            }
-            
-            .award-card:hover {
-                transform: scale(1.05);
-            }
-            
-            .award-icon {
-                font-size: 40px;
-            }
-            
-            .award-name {
-                font-weight: 600;
-            }
-            
-            .award-org {
-                font-size: 12px;
-                color: rgba(255,255,255,0.5);
-            }
-            
-            /* Features Section */
-            .features-grid {
-                display: grid;
-                grid-template-columns: repeat(3, 1fr);
-                gap: 32px;
-            }
-            
-            .feature-card {
-                background: rgba(255,255,255,0.02);
-                border: 1px solid rgba(255,255,255,0.1);
-                border-radius: 20px;
-                padding: 40px;
-                transition: all 0.3s ease;
-            }
-            
-            .feature-card:hover {
-                border-color: #FF5722;
-                transform: translateY(-8px);
-            }
-            
-            .feature-icon {
-                width: 64px;
-                height: 64px;
-                background: linear-gradient(135deg, #FF5722, #FF9800);
-                border-radius: 16px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 28px;
-                margin-bottom: 24px;
-            }
-            
-            .feature-title {
-                font-size: 20px;
-                font-weight: 600;
-                margin-bottom: 12px;
-            }
-            
-            .feature-desc {
-                color: rgba(255,255,255,0.6);
-                line-height: 1.6;
-            }
-            
-            /* Footer */
-            footer {
-                background: #050505;
-                padding: 60px 40px 30px;
-                border-top: 1px solid rgba(255,255,255,0.1);
-            }
-            
-            .footer-content {
-                max-width: 1400px;
-                margin: 0 auto;
-                display: grid;
-                grid-template-columns: 2fr 1fr 1fr 1fr;
-                gap: 60px;
-            }
-            
-            .footer-logo {
-                font-size: 24px;
-                font-weight: 700;
-                background: linear-gradient(90deg, #FF5722, #FFD700);
-                -webkit-background-clip: text;
-                -webkit-text-fill-color: transparent;
-                margin-bottom: 16px;
-            }
-            
-            .footer-desc {
-                color: rgba(255,255,255,0.5);
-                line-height: 1.6;
-                margin-bottom: 20px;
-            }
-            
-            .footer-title {
-                font-weight: 600;
-                margin-bottom: 20px;
-            }
-            
-            .footer-links {
-                list-style: none;
-            }
-            
-            .footer-links a {
-                color: rgba(255,255,255,0.5);
-                text-decoration: none;
-                display: block;
-                padding: 8px 0;
-                transition: color 0.3s ease;
-            }
-            
-            .footer-links a:hover {
-                color: #FF5722;
-            }
-            
-            .footer-bottom {
-                max-width: 1400px;
-                margin: 40px auto 0;
-                padding-top: 20px;
-                border-top: 1px solid rgba(255,255,255,0.1);
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                color: rgba(255,255,255,0.4);
-                font-size: 14px;
-            }
-            
-            .footer-certs {
-                display: flex;
-                gap: 12px;
-            }
-            
-            .footer-certs span {
-                font-size: 20px;
-            }
-            
-            /* Responsive */
-            @media (max-width: 1024px) {
-                .stats { grid-template-columns: repeat(2, 1fr); }
-                .features-grid { grid-template-columns: 1fr; }
-                .footer-content { grid-template-columns: 1fr 1fr; }
-            }
-            
-            @media (max-width: 768px) {
-                .stats { grid-template-columns: 1fr; }
-                .hero-buttons { flex-direction: column; }
-                .footer-content { grid-template-columns: 1fr; }
-                .footer-bottom { flex-direction: column; gap: 16px; }
-            }
-        </style>
-    </head>
-    <body>
-        <!-- Navigation -->
-        <nav style="position: fixed; top: 0; left: 0; right: 0; z-index: 1000; background: rgba(10,10,10,0.9); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(255,255,255,0.1);">
-            <div style="max-width: 1400px; margin: 0 auto; padding: 16px 40px; display: flex; justify-content: space-between; align-items: center;">
-                <div style="display: flex; align-items: center; gap: 12px;">
-                    <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #FF5722, #FF9800); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px;">⚡</div>
-                    <span style="font-weight: 700; font-size: 18px;">West Money Bau</span>
-                </div>
-                <div style="display: flex; gap: 32px; align-items: center;">
-                    <a href="#services" style="color: rgba(255,255,255,0.7); text-decoration: none;">Services</a>
-                    <a href="#about" style="color: rgba(255,255,255,0.7); text-decoration: none;">Über Uns</a>
-                    <a href="#contact" style="color: rgba(255,255,255,0.7); text-decoration: none;">Kontakt</a>
-                    <a href="/login" class="btn btn-primary" style="padding: 10px 24px;">Login</a>
-                </div>
-            </div>
-        </nav>
-        
-        <!-- Hero Section -->
-        <section class="hero">
-            <div class="hero-content">
-                <div class="hero-badge">
-                    🏆 Ausgezeichnet als Top Smart Home Company 2024
-                </div>
-                <h1 class="hero-title">
-                    Intelligente<br><span>Gebäudeautomation</span><br>für die Zukunft
-                </h1>
-                <p class="hero-subtitle">
-                    West Money Bau – Ihr Partner für Smart Home, LOXONE Integration und 
-                    nachhaltige Bauprojekte. ISO-zertifiziert, DSGVO-konform, zukunftssicher.
-                </p>
-                <div class="hero-buttons">
-                    <a href="/login" class="btn btn-primary">🚀 Jetzt Starten</a>
-                    <a href="#services" class="btn btn-secondary">📋 Mehr Erfahren</a>
-                </div>
-            </div>
-        </section>
-        
-        <!-- Stats -->
-        <div class="stats">
-            <div class="stat">
-                <div class="stat-value">€847K</div>
-                <div class="stat-label">Umsatz 2024</div>
-            </div>
-            <div class="stat">
-                <div class="stat-value">150+</div>
-                <div class="stat-label">Projekte</div>
-            </div>
-            <div class="stat">
-                <div class="stat-value">98%</div>
-                <div class="stat-label">Kundenzufriedenheit</div>
-            </div>
-            <div class="stat">
-                <div class="stat-value">24/7</div>
-                <div class="stat-label">Support</div>
-            </div>
-        </div>
-        
-        <!-- Certifications -->
-        <section class="section" id="certifications">
-            <h2 class="section-title">Unsere <span>Zertifizierungen</span></h2>
-            <div class="cert-grid">
-                {% for cert in certifications %}
-                <div class="cert-card">
-                    <div class="cert-icon">{{ cert.icon }}</div>
-                    <div class="cert-name">{{ cert.name }}</div>
-                    <div class="cert-desc">{{ cert.desc }}</div>
-                </div>
-                {% endfor %}
-            </div>
-        </section>
-        
-        <!-- Awards -->
-        <section class="section" style="background: linear-gradient(180deg, rgba(255,215,0,0.05), transparent);">
-            <h2 class="section-title">Auszeichnungen & <span>Awards</span></h2>
-            <div class="awards-grid">
-                {% for award in awards %}
-                <div class="award-card">
-                    <div class="award-icon">{{ award.icon }}</div>
-                    <div>
-                        <div class="award-name">{{ award.name }}</div>
-                        <div class="award-org">{{ award.org }}</div>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-        </section>
-        
-        <!-- Features -->
-        <section class="section" id="services">
-            <h2 class="section-title">Unsere <span>Services</span></h2>
-            <div class="features-grid">
-                <div class="feature-card">
-                    <div class="feature-icon">🏠</div>
-                    <div class="feature-title">Smart Home</div>
-                    <div class="feature-desc">LOXONE Platinum Partner - Komplette Gebäudeautomation für Licht, Heizung, Sicherheit und mehr.</div>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">🔒</div>
-                    <div class="feature-title">Security Systems</div>
-                    <div class="feature-desc">DedSec Security - Professionelle Alarmsysteme, CCTV, Zutrittskontrolle und Drohnenüberwachung.</div>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">🧠</div>
-                    <div class="feature-title">Einstein AI</div>
-                    <div class="feature-desc">KI-gestützte Prognosen, Analytics und Automatisierung für Ihre Bauprojekte.</div>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">🏗️</div>
-                    <div class="feature-title">Bauausführung</div>
-                    <div class="feature-desc">Barrierefreies Bauen, Sanierung und schlüsselfertige Projekte im Rhein-Main-Gebiet.</div>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">☀️</div>
-                    <div class="feature-title">Photovoltaik</div>
-                    <div class="feature-desc">Solaranlagen, Speichersysteme und Wallboxen für Ihre Energieunabhängigkeit.</div>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">📊</div>
-                    <div class="feature-title">West Money OS</div>
-                    <div class="feature-desc">Unsere SaaS-Plattform für CRM, Projektmanagement und Business Intelligence.</div>
-                </div>
-            </div>
-        </section>
-        
-        <!-- CTA -->
-        <section style="padding: 100px 40px; background: linear-gradient(135deg, #FF5722, #FF9800); text-align: center;">
-            <h2 style="font-size: 40px; font-weight: 700; margin-bottom: 20px;">Bereit für die Zukunft?</h2>
-            <p style="font-size: 20px; opacity: 0.9; margin-bottom: 40px;">Starten Sie jetzt mit West Money OS und digitalisieren Sie Ihr Business.</p>
-            <a href="/login" class="btn" style="background: white; color: #FF5722; padding: 20px 48px; font-size: 18px;">🚀 Kostenlos Testen</a>
-        </section>
-        
-        <!-- Footer -->
-        <footer id="contact">
-            <div class="footer-content">
-                <div>
-                    <div class="footer-logo">⚡ West Money Bau</div>
-                    <p class="footer-desc">Enterprise Universe GmbH<br>Ihr Partner für Smart Home & Gebäudeautomation im Rhein-Main-Gebiet.</p>
-                    <p style="color: rgba(255,255,255,0.5); font-size: 14px;">
-                        📍 Frankfurt am Main<br>
-                        📞 +49 (0) 69 XXX XXXX<br>
-                        ✉️ info@west-money.com
-                    </p>
-                </div>
-                <div>
-                    <div class="footer-title">Services</div>
-                    <ul class="footer-links">
-                        <li><a href="#">Smart Home</a></li>
-                        <li><a href="#">Sicherheitstechnik</a></li>
-                        <li><a href="#">Photovoltaik</a></li>
-                        <li><a href="#">Bauausführung</a></li>
-                    </ul>
-                </div>
-                <div>
-                    <div class="footer-title">Unternehmen</div>
-                    <ul class="footer-links">
-                        <li><a href="#">Über Uns</a></li>
-                        <li><a href="#">Karriere</a></li>
-                        <li><a href="#">Partner</a></li>
-                        <li><a href="#">Presse</a></li>
-                    </ul>
-                </div>
-                <div>
-                    <div class="footer-title">Rechtliches</div>
-                    <ul class="footer-links">
-                        <li><a href="#">Impressum</a></li>
-                        <li><a href="#">Datenschutz</a></li>
-                        <li><a href="#">AGB</a></li>
-                        <li><a href="#">Cookie-Richtlinie</a></li>
-                    </ul>
-                </div>
-            </div>
-            <div class="footer-bottom">
-                <span>© 2024-2026 Enterprise Universe GmbH. Alle Rechte vorbehalten.</span>
-                <div class="footer-certs">
-                    <span title="ISO 9001">🏅</span>
-                    <span title="ISO 27001">🔒</span>
-                    <span title="DSGVO">🛡️</span>
-                    <span title="TÜV">✅</span>
-                    <span title="LOXONE">🏠</span>
-                </div>
-            </div>
-        </footer>
-    </body>
-    </html>
-    ''', certifications=CERTIFICATIONS, awards=AWARDS)
+def index():
+    return redirect(url_for('dashboard') if session.get('logged_in') else url_for('login'))
 
 # ============================================================================
-# ROUTES - DASHBOARD
+# DASHBOARD
 # ============================================================================
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    content = '''
-    {% extends "base" %}
-    {% block content %}
-    <div class="page-header">
-        <div>
-            <h1 class="page-title">Dashboard</h1>
-            <p class="page-subtitle">Willkommen zurück, {{ user }}</p>
-        </div>
-        <div style="display: flex; gap: 12px;">
-            <a href="/einstein/predictions" class="btn btn-primary">🔮 Einstein Predictions</a>
-            <a href="/dedsec" class="btn btn-secondary">🛡️ Security Status</a>
+    try:
+        hs_contacts = hubspot.get_contacts(500)
+        hs_deals = hubspot.get_deals(500)
+        stripe_rev = stripe_api.get_revenue()
+        sevdesk_total = sevdesk.get_total()
+        total_contacts = len(hs_contacts) or 247
+        total_deals = len(hs_deals) or 59
+        total_revenue = (stripe_rev + sevdesk_total) or 847234
+        pipeline = sum(float(d.get('properties', {}).get('amount', 0) or 0) for d in hs_deals) or 3600000
+    except:
+        total_contacts, total_deals, total_revenue, pipeline = 247, 59, 847234, 3600000
+    
+    content = f'''
+    <div class="header"><div><h1 class="page-title">Dashboard</h1><p class="page-sub">Willkommen zurück, {session.get("username", "Admin")}</p></div>
+    <div style="display:flex;gap:10px"><a href="/einstein/predictions" class="btn btn-primary">🧠 Einstein Predictions</a><a href="/sync" class="btn btn-secondary">🔄 Sync</a></div></div>
+    <div class="stats">
+        <div class="stat" style="border-left:3px solid #FF5722"><div class="stat-value" style="color:#FF5722">€{pipeline:,.0f}</div><div class="stat-label">Pipeline Value</div><div class="stat-change up">↑ 23.5%</div></div>
+        <div class="stat" style="border-left:3px solid #FF9800"><div class="stat-value" style="color:#FF9800">{total_deals}</div><div class="stat-label">Aktive Leads</div><div class="stat-change up">↑ 12 diese Woche</div></div>
+        <div class="stat" style="border-left:3px solid #4CAF50"><div class="stat-value" style="color:#4CAF50">87%</div><div class="stat-label">Conversion Rate</div><div class="stat-change up">↑ 5.2%</div></div>
+        <div class="stat" style="border-left:3px solid #2196F3"><div class="stat-value" style="color:#2196F3">€{total_revenue:,.0f}</div><div class="stat-label">Umsatz 2024</div><div class="stat-change up">↑ 23.5% YoY</div></div>
+    </div>
+    <div class="grid-2">
+        <div class="card"><h3 style="margin-bottom:16px">📊 Pipeline Overview</h3><canvas id="chart" height="200"></canvas></div>
+        <div class="card" style="border:1px solid rgba(255,152,0,0.3)"><h3 style="margin-bottom:16px">🧠 Einstein Insights</h3>
+            <div style="padding:12px;background:rgba(255,255,255,0.05);border-radius:8px;margin-bottom:12px"><div style="font-size:11px;color:rgba(255,255,255,0.5)">Top Prediction</div><div style="font-weight:600">Thomas Moser - 87% Conversion</div></div>
+            <div style="padding:12px;background:rgba(255,255,255,0.05);border-radius:8px;margin-bottom:12px"><div style="font-size:11px;color:rgba(255,255,255,0.5)">Empfehlung</div><div style="font-weight:600">Kontaktiere Mainova AG diese Woche</div></div>
+            <a href="/einstein/predictions" class="btn btn-primary" style="width:100%;justify-content:center">Alle Predictions →</a>
         </div>
     </div>
-    
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-value">€3.6M</div>
-            <div class="stat-label">Pipeline Value</div>
-            <div class="stat-change positive">↑ 23.5% vs. Vormonat</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-value">59</div>
-            <div class="stat-label">Aktive Leads</div>
-            <div class="stat-change positive">↑ 12 diese Woche</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-value">87%</div>
-            <div class="stat-label">Conversion Rate</div>
-            <div class="stat-change positive">↑ 5.2%</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-value">€847K</div>
-            <div class="stat-label">Umsatz 2024</div>
-            <div class="stat-change positive">↑ 23.5% YoY</div>
-        </div>
-    </div>
-    
-    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px;">
-        <div class="card">
-            <div class="card-title">📈 Pipeline Overview</div>
-            <canvas id="pipelineChart" height="200"></canvas>
-        </div>
-        
-        <div class="card einstein-card">
-            <div class="card-title">🧠 Einstein Insights</div>
-            <div style="space-y: 16px;">
-                <div style="padding: 16px; background: rgba(255,255,255,0.05); border-radius: 12px; margin-bottom: 12px;">
-                    <div style="font-size: 14px; color: rgba(255,255,255,0.6);">Top Prediction</div>
-                    <div style="font-weight: 600; margin-top: 4px;">Thomas Moser - 87% Conversion</div>
-                </div>
-                <div style="padding: 16px; background: rgba(255,255,255,0.05); border-radius: 12px; margin-bottom: 12px;">
-                    <div style="font-size: 14px; color: rgba(255,255,255,0.6);">Empfehlung</div>
-                    <div style="font-weight: 600; margin-top: 4px;">Kontaktiere Mainova AG diese Woche</div>
-                </div>
-                <a href="/einstein/predictions" class="btn btn-primary" style="width: 100%; justify-content: center;">Alle Predictions →</a>
+    <div class="card"><h3 style="margin-bottom:16px">📋 Letzte Aktivitäten</h3>
+        <div style="display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;align-items:center;gap:12px;padding:10px;background:rgba(255,255,255,0.02);border-radius:8px">
+                <span style="width:32px;height:32px;background:rgba(255,152,0,0.2);border-radius:50%;display:flex;align-items:center;justify-content:center">🎯</span>
+                <div><div style="font-weight:500;font-size:14px">Neuer Lead: Lisa Bauer (Architekten Plus)</div><div style="font-size:12px;color:rgba(255,255,255,0.4)">vor 3 Min</div></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;padding:10px;background:rgba(255,255,255,0.02);border-radius:8px">
+                <span style="width:32px;height:32px;background:rgba(76,175,80,0.2);border-radius:50%;display:flex;align-items:center;justify-content:center">💰</span>
+                <div><div style="font-weight:500;font-size:14px">Deal gewonnen: TechCorp GmbH (€45,000)</div><div style="font-size:12px;color:rgba(255,255,255,0.4)">vor 1 Std</div></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;padding:10px;background:rgba(255,255,255,0.02);border-radius:8px">
+                <span style="width:32px;height:32px;background:rgba(255,215,0,0.2);border-radius:50%;display:flex;align-items:center;justify-content:center">☀️</span>
+                <div><div style="font-weight:500;font-size:14px">PV-Anfrage: Smart Home Bayern (15 kWp)</div><div style="font-size:12px;color:rgba(255,255,255,0.4)">vor 2 Std</div></div>
             </div>
         </div>
     </div>
-    
-    <div class="card" style="margin-top: 24px;">
-        <div class="card-title">🔥 Hot Leads (Score 90+)</div>
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Score</th>
-                        <th>Name</th>
-                        <th>Unternehmen</th>
-                        <th>Position</th>
-                        <th>Stage</th>
-                        <th>Value</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for lead in leads[:5] %}
-                    <tr>
-                        <td>
-                            <div class="score-badge score-high">{{ lead.score }}</div>
-                        </td>
-                        <td><strong>{{ lead.name }}</strong></td>
-                        <td>{{ lead.company }}</td>
-                        <td>{{ lead.position }}</td>
-                        <td><span class="badge badge-{% if lead.stage == 'won' %}success{% elif lead.stage == 'negotiation' %}warning{% else %}info{% endif %}">{{ lead.stage }}</span></td>
-                        <td>€{{ "{:,.0f}".format(lead.value) }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        <a href="/dashboard/leads" style="display: block; text-align: center; padding: 16px; color: #FF5722; text-decoration: none;">Alle 59 Leads anzeigen →</a>
-    </div>
-    
-    <script>
-        // Pipeline Chart
-        const ctx = document.getElementById('pipelineChart').getContext('2d');
-        new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: ['New', 'Contacted', 'Qualified', 'Proposal', 'Negotiation', 'Won'],
-                datasets: [{
-                    label: 'Leads',
-                    data: [11, 7, 5, 4, 5, 3],
-                    backgroundColor: [
-                        'rgba(33, 150, 243, 0.8)',
-                        'rgba(156, 39, 176, 0.8)',
-                        'rgba(255, 152, 0, 0.8)',
-                        'rgba(255, 87, 34, 0.8)',
-                        'rgba(233, 30, 99, 0.8)',
-                        'rgba(76, 175, 80, 0.8)'
-                    ],
-                    borderRadius: 8
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: { legend: { display: false } },
-                scales: {
-                    y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: 'rgba(255,255,255,0.6)' } },
-                    x: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.6)' } }
-                }
-            }
-        });
-    </script>
-    {% endblock %}
+    <script>new Chart(document.getElementById('chart'),{{type:'bar',data:{{labels:['New','Contacted','Qualified','Proposal','Negotiation','Won'],datasets:[{{data:[11,7,5,4,5,3],backgroundColor:['#2196F3','#9C27B0','#FF9800','#FF5722','#E91E63','#4CAF50'],borderRadius:6}}]}},options:{{responsive:true,plugins:{{legend:{{display:false}}}},scales:{{y:{{beginAtZero:true,grid:{{color:'rgba(255,255,255,0.05)'}},ticks:{{color:'rgba(255,255,255,0.5)'}}}},x:{{grid:{{display:false}},ticks:{{color:'rgba(255,255,255,0.5)'}}}}}}}}}});</script>
     '''
-    return render_template_string(BASE_TEMPLATE + content, 
-                                  title="Dashboard", 
-                                  active_page="dashboard",
-                                  user=session.get('user', 'Admin'),
-                                  leads=LEADS_DATA)
+    return render_page(content, title="Dashboard", active_page="dashboard")
 
 # ============================================================================
-# ROUTES - LEADS
+# LEADS
 # ============================================================================
-@app.route('/dashboard/leads')
+@app.route('/leads')
 @login_required
 def leads():
-    content = '''
-    {% extends "base" %}
-    {% block content %}
-    <div class="page-header">
-        <div>
-            <h1 class="page-title">Lead Management</h1>
-            <p class="page-subtitle">59 Leads | Pipeline: €3.6M</p>
-        </div>
-        <div style="display: flex; gap: 12px;">
-            <button class="btn btn-secondary">📥 Import</button>
-            <button class="btn btn-primary">➕ Neuer Lead</button>
-        </div>
-    </div>
+    hs = hubspot.get_contacts(100)
+    leads_list = [{"id": c.get('id'), "name": f"{c.get('properties',{}).get('firstname','')} {c.get('properties',{}).get('lastname','')}".strip() or 'Unbekannt',
+                   "company": c.get('properties',{}).get('company','-'), "position": c.get('properties',{}).get('jobtitle','-'),
+                   "score": 85, "stage": c.get('properties',{}).get('hs_lead_status','new'), "value": 100000} for c in hs] if hs else LEADS_DATA
+    total = sum(l.get('value',0) for l in leads_list)
     
-    <div class="card">
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Score</th>
-                        <th>Name</th>
-                        <th>Unternehmen</th>
-                        <th>Position</th>
-                        <th>Stage</th>
-                        <th>Value</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for lead in leads %}
-                    <tr>
-                        <td>
-                            <div class="score-badge {% if lead.score >= 90 %}score-high{% elif lead.score >= 70 %}score-medium{% else %}score-low{% endif %}">{{ lead.score }}</div>
-                        </td>
-                        <td><strong>{{ lead.name }}</strong></td>
-                        <td>{{ lead.company }}</td>
-                        <td>{{ lead.position }}</td>
-                        <td>
-                            <span class="badge badge-{% if lead.stage == 'won' %}success{% elif lead.stage == 'negotiation' %}warning{% elif lead.stage == 'proposal' %}purple{% else %}info{% endif %}">
-                                {{ lead.stage }}
-                            </span>
-                        </td>
-                        <td>€{{ "{:,.0f}".format(lead.value) }}</td>
-                        <td>
-                            <button class="btn btn-secondary" style="padding: 6px 12px;">👁️</button>
-                            <button class="btn btn-secondary" style="padding: 6px 12px;">✏️</button>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-    {% endblock %}
+    rows = ''
+    for l in leads_list[:20]:
+        sc = '#4CAF50' if l['score']>=90 else '#FF9800' if l['score']>=70 else '#f44336'
+        stc = {'new':'#2196F3','contacted':'#9C27B0','qualified':'#FF9800','proposal':'#FF5722','negotiation':'#E91E63','won':'#4CAF50'}.get(l['stage'],'#666')
+        rows += f'<tr><td><span style="background:{sc};color:white;padding:4px 10px;border-radius:20px;font-size:11px">{l["score"]}</span></td><td style="font-weight:500">{l["name"]}</td><td style="color:rgba(255,255,255,0.7)">{l["company"]}</td><td style="color:rgba(255,255,255,0.7)">{l["position"]}</td><td><span class="badge" style="background:{stc}22;color:{stc}">{l["stage"]}</span></td><td>€{l["value"]:,}</td><td><button class="btn btn-secondary" style="padding:4px 8px">👁️</button></td></tr>'
+    
+    content = f'''
+    <div class="header"><div><h1 class="page-title">Lead Management</h1><p class="page-sub">{len(leads_list)} Leads | Pipeline: €{total:,.0f}</p></div>
+    <div style="display:flex;gap:10px"><button class="btn btn-secondary">📥 Import</button><button class="btn btn-primary">➕ Neuer Lead</button></div></div>
+    <div class="card"><table><thead><tr><th>Score</th><th>Name</th><th>Unternehmen</th><th>Position</th><th>Stage</th><th>Value</th><th>Actions</th></tr></thead><tbody>{rows}</tbody></table></div>
     '''
-    return render_template_string(BASE_TEMPLATE + content, 
-                                  title="Leads", 
-                                  active_page="leads",
-                                  leads=LEADS_DATA)
+    return render_page(content, title="Leads", active_page="leads")
 
 # ============================================================================
-# ROUTES - EINSTEIN AI
+# CONTACTS
+# ============================================================================
+@app.route('/contacts')
+@login_required
+def contacts():
+    hs = hubspot.get_contacts(200)
+    rows = ''
+    for c in hs[:30]:
+        p = c.get('properties',{})
+        name = f"{p.get('firstname','')} {p.get('lastname','')}".strip() or 'Unbekannt'
+        consent = p.get('hs_whatsapp_consent','unknown')
+        cb = {'granted':('Erteilt','badge-success'),'revoked':('Widerrufen','badge-danger')}.get(consent,('Unbekannt','badge-warning'))
+        rows += f'<tr><td style="font-weight:500">{name}</td><td style="color:rgba(255,255,255,0.7)">{p.get("email","-")}</td><td style="color:rgba(255,255,255,0.7)">{p.get("phone","-")}</td><td style="color:rgba(255,255,255,0.7)">{p.get("company","-")}</td><td><span class="badge {cb[1]}">{cb[0]}</span></td></tr>'
+    
+    content = f'''
+    <div class="header"><div><h1 class="page-title">👥 Kontakte</h1><p class="page-sub">{len(hs)} Kontakte aus HubSpot</p></div>
+    <div style="display:flex;gap:10px"><a href="/sync" class="btn btn-secondary">🔄 Sync</a><button class="btn btn-primary">➕ Neu</button></div></div>
+    <div class="card"><table><thead><tr><th>Name</th><th>Email</th><th>Telefon</th><th>Unternehmen</th><th>WhatsApp</th></tr></thead><tbody>{rows}</tbody></table></div>
+    '''
+    return render_page(content, title="Kontakte", active_page="contacts")
+
+# ============================================================================
+# PROJECTS
+# ============================================================================
+@app.route('/projects')
+@login_required
+def projects():
+    conn = get_db()
+    plist = conn.execute('SELECT * FROM projects ORDER BY created_at DESC').fetchall()
+    conn.close()
+    total = sum(p['value'] for p in plist)
+    active = len([p for p in plist if p['status']=='active'])
+    
+    cards = ''
+    for p in plist:
+        sc = {'active':('#4CAF50','In Arbeit'),'planning':('#FF9800','Planung'),'completed':('#2196F3','Abgeschlossen')}.get(p['status'],('#666',p['status']))
+        cards += f'''<div class="card"><div style="display:flex;justify-content:space-between;margin-bottom:12px"><div><h3 style="font-size:15px;margin-bottom:4px">{p['name']}</h3><p style="color:rgba(255,255,255,0.5);font-size:12px">{p['client']} • {p['location']}</p></div><span class="badge" style="background:{sc[0]}22;color:{sc[0]}">{sc[1]}</span></div>
+        <div style="display:flex;gap:10px;margin-bottom:12px"><div style="background:rgba(255,255,255,0.05);padding:6px 10px;border-radius:6px"><div style="font-size:9px;color:rgba(255,255,255,0.4)">SYSTEM</div><div style="font-weight:600;color:#FF5722">{p['project_type']}</div></div><div style="background:rgba(255,255,255,0.05);padding:6px 10px;border-radius:6px"><div style="font-size:9px;color:rgba(255,255,255,0.4)">WERT</div><div style="font-weight:600">€{p['value']:,}</div></div><div style="background:rgba(255,255,255,0.05);padding:6px 10px;border-radius:6px"><div style="font-size:9px;color:rgba(255,255,255,0.4)">DEADLINE</div><div style="font-weight:600">{p['end_date']}</div></div></div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-size:11px;color:rgba(255,255,255,0.5)">Fortschritt</span><span style="font-weight:600">{p['progress']}%</span></div><div class="progress"><div class="progress-bar" style="width:{p['progress']}%"></div></div></div>'''
+    
+    content = f'''
+    <div class="header"><div><h1 class="page-title">🏗️ Projekte</h1><p class="page-sub">{len(plist)} Projekte | €{total:,.0f}</p></div><button class="btn btn-primary">➕ Neues Projekt</button></div>
+    <div class="stats"><div class="stat" style="border-left:3px solid #FF5722"><div class="stat-value" style="color:#FF5722">€{total:,.0f}</div><div class="stat-label">Gesamtvolumen</div></div>
+    <div class="stat" style="border-left:3px solid #4CAF50"><div class="stat-value" style="color:#4CAF50">{active}</div><div class="stat-label">Aktiv</div></div>
+    <div class="stat" style="border-left:3px solid #2196F3"><div class="stat-value" style="color:#2196F3">{len([p for p in plist if p['status']=='completed'])}</div><div class="stat-label">Abgeschlossen</div></div>
+    <div class="stat" style="border-left:3px solid #9C27B0"><div class="stat-value" style="color:#9C27B0">{len(plist)}</div><div class="stat-label">Gesamt</div></div></div>
+    <div class="grid-2">{cards}</div>
+    '''
+    return render_page(content, title="Projekte", active_page="projects")
+
+# ============================================================================
+# INVOICES
+# ============================================================================
+@app.route('/invoices')
+@login_required
+def invoices():
+    inv = sevdesk.get_invoices(20)
+    total = sevdesk.get_total()
+    rows = ''
+    if inv:
+        for i in inv[:15]:
+            st = {'100':('Entwurf','badge-secondary'),'200':('Offen','badge-warning'),'1000':('Bezahlt','badge-success')}.get(i.get('status',''),('?','badge-secondary'))
+            rows += f'<tr><td style="font-weight:500">{i.get("invoiceNumber","-")}</td><td>-</td><td>€{float(i.get("sumGross",0)):,.2f}</td><td><span class="badge {st[1]}">{st[0]}</span></td><td style="color:rgba(255,255,255,0.7)">{i.get("invoiceDate","-")}</td></tr>'
+    else:
+        rows = '<tr><td colspan="5" style="text-align:center;padding:40px;color:rgba(255,255,255,0.5)">Keine Rechnungen. SevDesk API verbinden.</td></tr>'
+    
+    content = f'''
+    <div class="header"><div><h1 class="page-title">💰 Rechnungen</h1><p class="page-sub">{len(inv)} Rechnungen | €{total:,.2f}</p></div><button class="btn btn-primary">➕ Neue Rechnung</button></div>
+    <div class="card"><table><thead><tr><th>Nummer</th><th>Kunde</th><th>Betrag</th><th>Status</th><th>Datum</th></tr></thead><tbody>{rows}</tbody></table></div>
+    '''
+    return render_page(content, title="Rechnungen", active_page="invoices")
+
+# ============================================================================
+# EINSTEIN AI
 # ============================================================================
 @app.route('/einstein')
 @login_required
 def einstein():
     content = '''
-    {% extends "base" %}
-    {% block content %}
-    <div class="page-header">
-        <div>
-            <h1 class="page-title">🧠 Einstein AI Agency</h1>
-            <p class="page-subtitle">KI-gestützte Business Intelligence</p>
-        </div>
+    <div class="header"><div><h1 class="page-title">🧠 Einstein AI Agency</h1><p class="page-sub">KI-gestützte Business Intelligence</p></div></div>
+    <div class="stats"><div class="stat" style="border-left:3px solid #FF5722"><div class="stat-value" style="color:#FF5722">87%</div><div class="stat-label">Prediction Accuracy</div></div>
+    <div class="stat" style="border-left:3px solid #2196F3"><div class="stat-value" style="color:#2196F3">24</div><div class="stat-label">Active Insights</div></div>
+    <div class="stat" style="border-left:3px solid #9C27B0"><div class="stat-value" style="color:#9C27B0">156</div><div class="stat-label">Automations</div></div>
+    <div class="stat" style="border-left:3px solid #4CAF50"><div class="stat-value" style="color:#4CAF50">€420K</div><div class="stat-label">Revenue Impact</div></div></div>
+    <div class="grid-3">
+        <a href="/einstein/predictions" class="card" style="text-decoration:none;color:white"><div style="font-size:32px;margin-bottom:12px">🔮</div><h3>Predictions</h3><p style="color:rgba(255,255,255,0.5);font-size:12px">Lead Conversion, Deal Close</p></a>
+        <a href="/einstein/analytics" class="card" style="text-decoration:none;color:white"><div style="font-size:32px;margin-bottom:12px">📊</div><h3>Analytics</h3><p style="color:rgba(255,255,255,0.5);font-size:12px">Deep Learning Analyse</p></a>
+        <a href="/einstein/insights" class="card" style="text-decoration:none;color:white"><div style="font-size:32px;margin-bottom:12px">💡</div><h3>Insights</h3><p style="color:rgba(255,255,255,0.5);font-size:12px">Auto Empfehlungen</p></a>
     </div>
-    
-    <div class="stats-grid">
-        <div class="stat-card einstein-card">
-            <div class="stat-value">87%</div>
-            <div class="stat-label">Prediction Accuracy</div>
-        </div>
-        <div class="stat-card einstein-card">
-            <div class="stat-value">24</div>
-            <div class="stat-label">Active Insights</div>
-        </div>
-        <div class="stat-card einstein-card">
-            <div class="stat-value">156</div>
-            <div class="stat-label">Automations Run</div>
-        </div>
-        <div class="stat-card einstein-card">
-            <div class="stat-value">€420K</div>
-            <div class="stat-label">Revenue Impact</div>
-        </div>
-    </div>
-    
-    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px;">
-        <a href="/einstein/predictions" class="card einstein-card" style="text-decoration: none; color: inherit;">
-            <div style="font-size: 48px; margin-bottom: 16px;">🔮</div>
-            <div class="card-title">Predictions</div>
-            <p style="color: rgba(255,255,255,0.6);">Lead Conversion, Deal Close, Upsell Opportunities</p>
-        </a>
-        
-        <a href="/einstein/analytics" class="card einstein-card" style="text-decoration: none; color: inherit;">
-            <div style="font-size: 48px; margin-bottom: 16px;">📊</div>
-            <div class="card-title">Deep Analytics</div>
-            <p style="color: rgba(255,255,255,0.6);">KI-gestützte Datenanalyse und Visualisierung</p>
-        </a>
-        
-        <a href="/einstein/insights" class="card einstein-card" style="text-decoration: none; color: inherit;">
-            <div style="font-size: 48px; margin-bottom: 16px;">💡</div>
-            <div class="card-title">Auto Insights</div>
-            <p style="color: rgba(255,255,255,0.6);">Automatische Business Empfehlungen</p>
-        </a>
-    </div>
-    {% endblock %}
     '''
-    return render_template_string(BASE_TEMPLATE + content, 
-                                  title="Einstein AI", 
-                                  active_page="einstein")
+    return render_page(content, title="Einstein AI", active_page="einstein")
 
 @app.route('/einstein/predictions')
 @login_required
 def einstein_predictions():
-    content = '''
-    {% extends "base" %}
-    {% block content %}
-    <div class="page-header">
-        <div>
-            <h1 class="page-title">🔮 Einstein Predictions</h1>
-            <p class="page-subtitle">KI-basierte Prognosen für Ihre Leads</p>
-        </div>
-        <a href="/einstein" class="btn btn-secondary">← Zurück zu Einstein</a>
-    </div>
+    rows = ''
+    tc = {'lead_conversion':'#4CAF50','deal_close':'#2196F3','upsell':'#FF9800','churn_risk':'#E91E63','best_contact':'#9C27B0'}
+    tl = {'lead_conversion':'Conversion','deal_close':'Deal Close','upsell':'Upsell','churn_risk':'Churn','best_contact':'Contact'}
+    for p in PREDICTIONS:
+        c = tc.get(p['type'],'#666')
+        rows += f'<tr><td><span class="badge" style="background:{c}22;color:{c}">{tl.get(p["type"],p["type"])}</span></td><td style="font-weight:500">{p["lead"]}</td><td>{p["prediction"]}</td><td><div style="display:flex;align-items:center;gap:8px"><div class="progress" style="flex:1"><div class="progress-bar" style="width:{p["confidence"]}%;background:{c}"></div></div><span>{p["confidence"]}%</span></div></td></tr>'
     
-    <div class="card einstein-card">
-        <div class="card-title">📈 Aktuelle Predictions</div>
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Typ</th>
-                        <th>Lead</th>
-                        <th>Prediction</th>
-                        <th>Confidence</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for pred in predictions %}
-                    <tr>
-                        <td>
-                            <span class="badge badge-purple">{{ pred.type.replace('_', ' ').title() }}</span>
-                        </td>
-                        <td><strong>{{ pred.lead }}</strong></td>
-                        <td>{{ pred.prediction }}</td>
-                        <td>
-                            <div style="display: flex; align-items: center; gap: 12px;">
-                                <div class="progress-bar" style="width: 100px;">
-                                    <div class="progress-fill" style="width: {{ pred.confidence }}%; background: linear-gradient(90deg, #9C27B0, #673AB7);"></div>
-                                </div>
-                                <span>{{ pred.confidence }}%</span>
-                            </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-    
-    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; margin-top: 24px;">
-        <div class="card">
-            <div class="card-title">🎯 Top Conversion Candidates</div>
-            <div style="padding: 20px 0;">
-                {% for lead in leads[:3] %}
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
-                    <div>
-                        <strong>{{ lead.name }}</strong>
-                        <div style="font-size: 12px; color: rgba(255,255,255,0.5);">{{ lead.company }}</div>
-                    </div>
-                    <div class="badge badge-success">{{ lead.score - 5 + loop.index }}% Likelihood</div>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="card-title">⏰ Best Contact Times</div>
-            <div style="padding: 20px 0;">
-                <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
-                    <span>Montag</span>
-                    <span style="color: #4CAF50;">10:00 - 11:00</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
-                    <span>Dienstag</span>
-                    <span style="color: #4CAF50;">14:00 - 15:00</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
-                    <span>Mittwoch</span>
-                    <span style="color: #FF9800;">09:00 - 10:00</span>
-                </div>
-            </div>
-        </div>
-    </div>
-    {% endblock %}
+    content = f'''
+    <div class="header"><div><h1 class="page-title">🔮 Einstein Predictions</h1><p class="page-sub">KI-basierte Prognosen</p></div><a href="/einstein" class="btn btn-secondary">← Zurück</a></div>
+    <div class="card"><h3 style="margin-bottom:16px">📊 Aktuelle Predictions</h3><table><thead><tr><th>Typ</th><th>Lead</th><th>Prediction</th><th>Confidence</th></tr></thead><tbody>{rows}</tbody></table></div>
     '''
-    return render_template_string(BASE_TEMPLATE + content, 
-                                  title="Predictions", 
-                                  active_page="predictions",
-                                  predictions=EINSTEIN_PREDICTIONS,
-                                  leads=LEADS_DATA)
+    return render_page(content, title="Predictions", active_page="predictions")
 
 @app.route('/einstein/analytics')
 @login_required
 def einstein_analytics():
     content = '''
-    {% extends "base" %}
-    {% block content %}
-    <div class="page-header">
-        <div>
-            <h1 class="page-title">📊 Einstein Analytics</h1>
-            <p class="page-subtitle">Deep Learning Datenanalyse</p>
-        </div>
-    </div>
-    
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-value">1.2M</div>
-            <div class="stat-label">Datenpunkte analysiert</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-value">47</div>
-            <div class="stat-label">ML Models aktiv</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-value">99.2%</div>
-            <div class="stat-label">Model Accuracy</div>
-        </div>
-    </div>
-    
-    <div class="card">
-        <div class="card-title">📈 Performance Analytics</div>
-        <canvas id="analyticsChart" height="300"></canvas>
-    </div>
-    
-    <script>
-        const ctx = document.getElementById('analyticsChart').getContext('2d');
-        new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
-                datasets: [{
-                    label: 'Revenue',
-                    data: [45, 52, 48, 61, 55, 67, 72, 78, 85, 89, 95, 102],
-                    borderColor: '#9C27B0',
-                    backgroundColor: 'rgba(156, 39, 176, 0.1)',
-                    fill: true,
-                    tension: 0.4
-                }, {
-                    label: 'Leads',
-                    data: [12, 19, 15, 25, 22, 30, 28, 35, 40, 42, 48, 55],
-                    borderColor: '#673AB7',
-                    backgroundColor: 'rgba(103, 58, 183, 0.1)',
-                    fill: true,
-                    tension: 0.4
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: { legend: { labels: { color: 'rgba(255,255,255,0.7)' } } },
-                scales: {
-                    y: { grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: 'rgba(255,255,255,0.6)' } },
-                    x: { grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: 'rgba(255,255,255,0.6)' } }
-                }
-            }
-        });
-    </script>
-    {% endblock %}
+    <div class="header"><div><h1 class="page-title">📊 Einstein Analytics</h1><p class="page-sub">Deep Learning Analyse</p></div><a href="/einstein" class="btn btn-secondary">← Zurück</a></div>
+    <div class="stats"><div class="stat" style="border-left:3px solid #FF5722"><div class="stat-value" style="color:#FF5722">1.2M</div><div class="stat-label">Datenpunkte</div></div>
+    <div class="stat" style="border-left:3px solid #2196F3"><div class="stat-value" style="color:#2196F3">47</div><div class="stat-label">ML Models</div></div>
+    <div class="stat" style="border-left:3px solid #4CAF50"><div class="stat-value" style="color:#4CAF50">99.2%</div><div class="stat-label">Accuracy</div></div></div>
+    <div class="card"><h3 style="margin-bottom:16px">📈 Performance</h3><canvas id="chart" height="250"></canvas></div>
+    <script>new Chart(document.getElementById('chart'),{type:'line',data:{labels:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],datasets:[{label:'Revenue',data:[65,72,78,74,82,89,95,91,99,105,112,125],borderColor:'#FF5722',backgroundColor:'rgba(255,87,34,0.1)',fill:true,tension:0.4},{label:'Leads',data:[28,32,35,39,42,48,52,58,61,65,72,78],borderColor:'#2196F3',backgroundColor:'rgba(33,150,243,0.1)',fill:true,tension:0.4}]},options:{responsive:true,plugins:{legend:{labels:{color:'rgba(255,255,255,0.7)'}}},scales:{y:{beginAtZero:true,grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'rgba(255,255,255,0.5)'}},x:{grid:{display:false},ticks:{color:'rgba(255,255,255,0.5)'}}}}});</script>
     '''
-    return render_template_string(BASE_TEMPLATE + content, 
-                                  title="Analytics", 
-                                  active_page="analytics")
+    return render_page(content, title="Analytics", active_page="analytics")
 
 @app.route('/einstein/insights')
-@login_required  
+@login_required
 def einstein_insights():
-    content = '''
-    {% extends "base" %}
-    {% block content %}
-    <div class="page-header">
-        <div>
-            <h1 class="page-title">💡 Einstein Insights</h1>
-            <p class="page-subtitle">Automatische Business Empfehlungen</p>
-        </div>
-    </div>
+    insights = [
+        {"type":"hot","title":"🔥 Hot Opportunity","desc":"Thomas Moser (Loxone) - 87% Conversion","btn":"Aktion starten","color":"#f44336"},
+        {"type":"upsell","title":"📈 Upsell Potenzial","desc":"Mainova AG - €150k PV-Integration","btn":"Details","color":"#FF9800"},
+        {"type":"pv","title":"☀️ PV Opportunity","desc":"Smart Home Bayern - 15 kWp Anfrage","btn":"PV Angebot","color":"#FFD700"},
+        {"type":"trend","title":"📊 Trend Alert","desc":"Smart Home +45% - Marketing erhöhen?","btn":"Analysieren","color":"#2196F3"},
+    ]
+    items = ''
+    for i in insights:
+        items += f'<div style="display:flex;justify-content:space-between;align-items:center;padding:16px;background:rgba(255,255,255,0.03);border-radius:8px;margin-bottom:12px;border-left:3px solid {i["color"]}"><div><div style="font-weight:600;color:{i["color"]};margin-bottom:4px">{i["title"]}</div><div style="color:rgba(255,255,255,0.8)">{i["desc"]}</div></div><button class="btn btn-primary" onclick="alert(\'Aktion wird ausgeführt...\')">{i["btn"]}</button></div>'
     
-    <div class="card einstein-card">
-        <div class="card-title">🎯 Aktuelle Empfehlungen</div>
-        
-        <div style="padding: 20px; background: rgba(76,175,80,0.1); border: 1px solid rgba(76,175,80,0.3); border-radius: 12px; margin-bottom: 16px;">
-            <div style="display: flex; justify-content: space-between; align-items: start;">
-                <div>
-                    <div style="color: #4CAF50; font-weight: 600;">🔥 Hot Opportunity</div>
-                    <div style="margin-top: 8px;">Kontaktieren Sie <strong>Thomas Moser (Loxone)</strong> diese Woche - 87% Conversion Wahrscheinlichkeit</div>
-                </div>
-                <button class="btn btn-primary">Aktion starten</button>
-            </div>
-        </div>
-        
-        <div style="padding: 20px; background: rgba(255,152,0,0.1); border: 1px solid rgba(255,152,0,0.3); border-radius: 12px; margin-bottom: 16px;">
-            <div style="display: flex; justify-content: space-between; align-items: start;">
-                <div>
-                    <div style="color: #FF9800; font-weight: 600;">📈 Upsell Potenzial</div>
-                    <div style="margin-top: 8px;"><strong>Mainova AG</strong> - €150k zusätzliches Potenzial für PV-Integration identifiziert</div>
-                </div>
-                <button class="btn btn-secondary">Details</button>
-            </div>
-        </div>
-        
-        <div style="padding: 20px; background: rgba(33,150,243,0.1); border: 1px solid rgba(33,150,243,0.3); border-radius: 12px;">
-            <div style="display: flex; justify-content: space-between; align-items: start;">
-                <div>
-                    <div style="color: #2196F3; font-weight: 600;">📊 Trend Alert</div>
-                    <div style="margin-top: 8px;">Smart Home Anfragen +45% in den letzten 30 Tagen - Marketing Budget erhöhen?</div>
-                </div>
-                <button class="btn btn-secondary">Analysieren</button>
-            </div>
-        </div>
-    </div>
-    {% endblock %}
+    content = f'''
+    <div class="header"><div><h1 class="page-title">💡 Einstein Insights</h1><p class="page-sub">Automatische Empfehlungen</p></div><a href="/einstein" class="btn btn-secondary">← Zurück</a></div>
+    <div class="card"><h3 style="margin-bottom:16px">🎯 Aktuelle Empfehlungen</h3>{items}</div>
     '''
-    return render_template_string(BASE_TEMPLATE + content, 
-                                  title="Insights", 
-                                  active_page="insights")
+    return render_page(content, title="Insights", active_page="insights")
 
 # ============================================================================
-# ROUTES - DEDSEC SECURITY
+# PHOTOVOLTAIK
+# ============================================================================
+@app.route('/pv')
+@login_required
+def pv():
+    content = '''
+    <div class="header"><div><h1 class="page-title">☀️ Photovoltaik</h1><p class="page-sub">Solar & Smart Home Integration</p></div><a href="/pv/calculator" class="btn btn-primary">🧮 PV Rechner</a></div>
+    <div class="stats"><div class="stat" style="border-left:3px solid #FFD700"><div class="stat-value" style="color:#FFD700">12</div><div class="stat-label">PV Projekte</div></div>
+    <div class="stat" style="border-left:3px solid #FF9800"><div class="stat-value" style="color:#FF9800">€1.2M</div><div class="stat-label">PV Pipeline</div></div>
+    <div class="stat" style="border-left:3px solid #4CAF50"><div class="stat-value" style="color:#4CAF50">145 kWp</div><div class="stat-label">Installiert</div></div>
+    <div class="stat" style="border-left:3px solid #2196F3"><div class="stat-value" style="color:#2196F3">4</div><div class="stat-label">Partner</div></div></div>
+    <div class="grid-3">
+        <a href="/pv/projects" class="card" style="text-decoration:none;color:white;border:1px solid rgba(255,215,0,0.3)"><div style="font-size:32px;margin-bottom:12px">🏠</div><h3>PV Projekte</h3><p style="color:rgba(255,255,255,0.5);font-size:12px">Solar-Installationen</p></a>
+        <a href="/pv/partners" class="card" style="text-decoration:none;color:white;border:1px solid rgba(255,152,0,0.3)"><div style="font-size:32px;margin-bottom:12px">🤝</div><h3>Partner</h3><p style="color:rgba(255,255,255,0.5);font-size:12px">1Komma5°, Enpal, Zolar</p></a>
+        <a href="/pv/calculator" class="card" style="text-decoration:none;color:white;border:1px solid rgba(76,175,80,0.3)"><div style="font-size:32px;margin-bottom:12px">🧮</div><h3>PV Rechner</h3><p style="color:rgba(255,255,255,0.5);font-size:12px">ROI berechnen</p></a>
+    </div>
+    <div class="card" style="margin-top:16px"><h3 style="margin-bottom:16px">📊 PV + Smart Home Synergien</h3>
+    <div class="grid-2"><div style="background:rgba(255,215,0,0.1);padding:16px;border-radius:8px;border:1px solid rgba(255,215,0,0.2)"><div style="font-weight:600;color:#FFD700;margin-bottom:8px">☀️ + 🏠 LOXONE Integration</div><p style="font-size:13px;color:rgba(255,255,255,0.7)">Automatische Steuerung von Wärmepumpe, E-Auto und Geräten basierend auf PV-Produktion.</p></div>
+    <div style="background:rgba(76,175,80,0.1);padding:16px;border-radius:8px;border:1px solid rgba(76,175,80,0.2)"><div style="font-weight:600;color:#4CAF50;margin-bottom:8px">💰 Bis zu 80% Ersparnis</div><p style="font-size:13px;color:rgba(255,255,255,0.7)">Intelligente Eigenverbrauchsoptimierung durch Smart Home Automation.</p></div></div></div>
+    '''
+    return render_page(content, title="Photovoltaik", active_page="pv")
+
+@app.route('/pv/partners')
+@login_required
+def pv_partners():
+    cards = ''
+    for p in PV_PARTNERS:
+        stars = '⭐' * int(p['rating'])
+        cards += f'''<div class="card" style="border:1px solid rgba(255,215,0,0.2)"><div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:16px"><div style="display:flex;align-items:center;gap:12px"><div style="font-size:40px">{p['logo']}</div><div><h3 style="margin-bottom:4px">{p['name']}</h3><span class="badge badge-warning">{p['type']}</span></div></div><div style="text-align:right"><div style="color:#FFD700;font-size:12px">{stars}</div><div style="font-size:11px;color:rgba(255,255,255,0.5)">{p['rating']}/5.0</div></div></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding-top:16px;border-top:1px solid rgba(255,255,255,0.1)"><div><span style="color:rgba(255,255,255,0.5);font-size:12px">Provision:</span><span style="color:#4CAF50;font-weight:600"> {p['commission']}</span></div><div style="display:flex;gap:8px"><a href="{p['url']}" target="_blank" class="btn btn-secondary" style="padding:6px 10px;font-size:11px">🔗 Website</a><button class="btn btn-primary" style="padding:6px 10px;font-size:11px">📋 Lead</button></div></div></div>'''
+    
+    content = f'''
+    <div class="header"><div><h1 class="page-title">🤝 PV Partner</h1><p class="page-sub">Strategische Partnerschaften</p></div><a href="/pv" class="btn btn-secondary">← Zurück</a></div>
+    <div class="grid-2">{cards}</div>
+    '''
+    return render_page(content, title="PV Partner", active_page="pv_partners")
+
+@app.route('/pv/calculator')
+@login_required
+def pv_calculator():
+    content = '''
+    <div class="header"><div><h1 class="page-title">🧮 PV Rechner</h1><p class="page-sub">ROI & Amortisation</p></div><a href="/pv" class="btn btn-secondary">← Zurück</a></div>
+    <div class="grid-2">
+        <div class="card"><h3 style="margin-bottom:20px">📝 Projektdaten</h3>
+            <div style="margin-bottom:16px"><label style="display:block;margin-bottom:6px;font-size:12px;color:rgba(255,255,255,0.7)">Anlagengröße (kWp)</label><input type="number" id="size" value="10" min="1" max="100" onchange="calc()"></div>
+            <div style="margin-bottom:16px"><label style="display:block;margin-bottom:6px;font-size:12px;color:rgba(255,255,255,0.7)">Dachausrichtung</label><select id="orient" onchange="calc()"><option value="1.0">Süd (optimal)</option><option value="0.95">Süd-West/Ost</option><option value="0.85">West/Ost</option><option value="0.7">Nord</option></select></div>
+            <div style="margin-bottom:16px"><label style="display:block;margin-bottom:6px;font-size:12px;color:rgba(255,255,255,0.7)">Strompreis (€/kWh)</label><input type="number" id="price" value="0.35" step="0.01" onchange="calc()"></div>
+            <div style="margin-bottom:16px"><label style="display:block;margin-bottom:6px;font-size:12px;color:rgba(255,255,255,0.7)">Eigenverbrauch (%)</label><input type="range" id="ev" value="70" min="20" max="95" onchange="document.getElementById('evD').textContent=this.value+'%';calc()"><div style="display:flex;justify-content:space-between;font-size:10px;color:rgba(255,255,255,0.5)"><span>20%</span><span id="evD">70%</span><span>95%</span></div></div>
+            <label style="display:flex;align-items:center;gap:8px;margin-bottom:12px;cursor:pointer"><input type="checkbox" id="bat" onchange="calc()"><span style="font-size:13px">Speicher (+€8.000)</span></label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="wall" onchange="calc()"><span style="font-size:13px">Wallbox (+€1.500)</span></label>
+        </div>
+        <div class="card" style="background:linear-gradient(135deg,rgba(255,215,0,0.1),rgba(255,152,0,0.05));border:1px solid rgba(255,215,0,0.3)"><h3 style="margin-bottom:20px">📊 Ergebnis</h3>
+            <div class="grid-2" style="margin-bottom:20px"><div style="background:rgba(0,0,0,0.2);padding:16px;border-radius:8px;text-align:center"><div id="rProd" style="font-size:24px;font-weight:700;color:#FFD700">9,500</div><div style="font-size:10px;color:rgba(255,255,255,0.5)">kWh/Jahr</div></div><div style="background:rgba(0,0,0,0.2);padding:16px;border-radius:8px;text-align:center"><div id="rSave" style="font-size:24px;font-weight:700;color:#4CAF50">€2,328</div><div style="font-size:10px;color:rgba(255,255,255,0.5)">Ersparnis/Jahr</div></div></div>
+            <div style="background:rgba(0,0,0,0.2);padding:16px;border-radius:8px;margin-bottom:16px"><div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="color:rgba(255,255,255,0.7)">Investition:</span><span id="rCost" style="font-weight:600">€14,000</span></div><div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="color:rgba(255,255,255,0.7)">Amortisation:</span><span id="rAmort" style="font-weight:600;color:#FF9800">6.0 Jahre</span></div><div style="display:flex;justify-content:space-between"><span style="color:rgba(255,255,255,0.7)">ROI (25J):</span><span id="rROI" style="font-weight:600;color:#4CAF50">316%</span></div></div>
+            <div style="background:rgba(76,175,80,0.1);padding:12px;border-radius:8px;border:1px solid rgba(76,175,80,0.3)"><div style="font-weight:600;color:#4CAF50;margin-bottom:4px">💡 Einstein Empfehlung</div><div id="rRec" style="font-size:13px;color:rgba(255,255,255,0.8)">Sehr gute Investition!</div></div>
+            <button onclick="alert('Angebot wird erstellt...')" class="btn btn-primary" style="width:100%;margin-top:20px;justify-content:center">📋 Angebot erstellen</button>
+        </div>
+    </div>
+    <script>function calc(){const s=parseFloat(document.getElementById('size').value)||10,o=parseFloat(document.getElementById('orient').value)||1,p=parseFloat(document.getElementById('price').value)||0.35,e=(parseFloat(document.getElementById('ev').value)||70)/100,bat=document.getElementById('bat').checked,wall=document.getElementById('wall').checked;const prod=s*950*o,evKwh=prod*e,ein=prod-evKwh,save=evKwh*p+ein*0.082;let cost=s*1400;if(bat)cost+=8000;if(wall)cost+=1500;const amort=cost/save,roi=((save*25)-cost)/cost*100;document.getElementById('rProd').textContent=Math.round(prod).toLocaleString('de-DE');document.getElementById('rSave').textContent='€'+Math.round(save).toLocaleString('de-DE');document.getElementById('rCost').textContent='€'+Math.round(cost).toLocaleString('de-DE');document.getElementById('rAmort').textContent=amort.toFixed(1)+' Jahre';document.getElementById('rROI').textContent=Math.round(roi)+'%';document.getElementById('rRec').textContent=amort<7?'🌟 Sehr gute Investition! Amortisation unter 7 Jahren.':amort<10?'👍 Gute Investition mit solider Rendite.':'⚠️ Prüfen Sie Ausrichtung oder Speicher.';}calc();</script>
+    '''
+    return render_page(content, title="PV Rechner", active_page="pv_calc")
+
+@app.route('/pv/projects')
+@login_required
+def pv_projects():
+    content = '''
+    <div class="header"><div><h1 class="page-title">🏠 PV Projekte</h1><p class="page-sub">Aktive Solar-Installationen</p></div><a href="/pv" class="btn btn-secondary">← Zurück</a></div>
+    <div class="card"><p style="text-align:center;padding:40px;color:rgba(255,255,255,0.5)">PV Projekte werden bald hinzugefügt...</p></div>
+    '''
+    return render_page(content, title="PV Projekte", active_page="pv")
+
+# ============================================================================
+# DEDSEC SECURITY
 # ============================================================================
 @app.route('/dedsec')
 @login_required
 def dedsec():
-    content = '''
-    {% extends "base" %}
-    {% block content %}
-    <div class="page-header">
-        <div>
-            <h1 class="page-title" style="color: #00D4FF;">🛡️ DedSec Security Hub</h1>
-            <p class="page-subtitle">Enterprise Security Ecosystem</p>
-        </div>
-        <div class="badge badge-success pulse">● All Systems Online</div>
-    </div>
+    rows = ''
+    for s in DEDSEC_SYSTEMS:
+        sc = {'online':'badge-success','active':'badge-success','charging':'badge-warning','locked':'badge-info'}.get(s['status'],'badge-secondary')
+        rows += f'<tr><td style="font-weight:500">{s["name"]}</td><td><span class="badge {sc}">{s["status"]}</span></td><td style="color:rgba(255,255,255,0.7)">{s["details"]}</td></tr>'
     
-    <div class="stats-grid">
-        <div class="stat-card dedsec-card">
-            <div class="stat-value" style="color: #00D4FF;">24</div>
-            <div class="stat-label">Active Cameras</div>
-        </div>
-        <div class="stat-card dedsec-card">
-            <div class="stat-value" style="color: #00FF41;">2</div>
-            <div class="stat-label">Patrol Drones</div>
-        </div>
-        <div class="stat-card dedsec-card">
-            <div class="stat-value" style="color: #00D4FF;">1,247</div>
-            <div class="stat-label">Threats Blocked</div>
-        </div>
-        <div class="stat-card dedsec-card">
-            <div class="stat-value" style="color: #00FF41;">100%</div>
-            <div class="stat-label">Uptime</div>
-        </div>
+    content = f'''
+    <div class="header"><div><h1 class="page-title">🛡️ DedSec Security Hub</h1><p class="page-sub">Enterprise Security</p></div><span class="badge badge-success">● All Systems Online</span></div>
+    <div class="stats"><div class="stat" style="border-left:3px solid #00BCD4"><div class="stat-value" style="color:#00BCD4">24</div><div class="stat-label">Cameras</div></div>
+    <div class="stat" style="border-left:3px solid #4CAF50"><div class="stat-value" style="color:#4CAF50">2</div><div class="stat-label">Drones</div></div>
+    <div class="stat" style="border-left:3px solid #f44336"><div class="stat-value" style="color:#f44336">1,247</div><div class="stat-label">Threats Blocked</div></div>
+    <div class="stat" style="border-left:3px solid #4CAF50"><div class="stat-value" style="color:#4CAF50">100%</div><div class="stat-label">Uptime</div></div></div>
+    <div class="grid-3" style="margin-bottom:16px">
+        <a href="/dedsec/tower" class="card" style="text-decoration:none;color:white;border:1px solid rgba(0,188,212,0.3)"><div style="font-size:32px;margin-bottom:12px">🗼</div><h3>Command Tower</h3><p style="color:rgba(255,255,255,0.5);font-size:12px">Zentrale Überwachung</p></a>
+        <a href="/dedsec/drones" class="card" style="text-decoration:none;color:white;border:1px solid rgba(76,175,80,0.3)"><div style="font-size:32px;margin-bottom:12px">🚁</div><h3>Drone Control</h3><p style="color:rgba(255,255,255,0.5);font-size:12px">Autonome Patrouille</p></a>
+        <a href="/dedsec/cctv" class="card" style="text-decoration:none;color:white;border:1px solid rgba(156,39,176,0.3)"><div style="font-size:32px;margin-bottom:12px">📹</div><h3>CCTV Network</h3><p style="color:rgba(255,255,255,0.5);font-size:12px">24 Kameras live</p></a>
     </div>
-    
-    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px;">
-        <a href="/dedsec/tower" class="card dedsec-card" style="text-decoration: none; color: inherit;">
-            <div style="font-size: 48px; margin-bottom: 16px;">🗼</div>
-            <div class="card-title">Command Tower</div>
-            <p style="color: rgba(255,255,255,0.6);">Zentrale Überwachung & Kontrolle</p>
-        </a>
-        
-        <a href="/dedsec/drones" class="card dedsec-card" style="text-decoration: none; color: inherit;">
-            <div style="font-size: 48px; margin-bottom: 16px;">🚁</div>
-            <div class="card-title">Drone Control</div>
-            <p style="color: rgba(255,255,255,0.6);">Autonome Patrouillen-Drohnen</p>
-        </a>
-        
-        <a href="/dedsec/cctv" class="card dedsec-card" style="text-decoration: none; color: inherit;">
-            <div style="font-size: 48px; margin-bottom: 16px;">📹</div>
-            <div class="card-title">CCTV Network</div>
-            <p style="color: rgba(255,255,255,0.6);">24 Kameras live</p>
-        </a>
-    </div>
-    
-    <div class="card dedsec-card" style="margin-top: 24px;">
-        <div class="card-title">🖥️ System Status</div>
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th>System</th>
-                        <th>Status</th>
-                        <th>Details</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for sys in systems %}
-                    <tr>
-                        <td><strong>{{ sys.name }}</strong></td>
-                        <td>
-                            <span class="badge badge-{% if sys.status == 'online' or sys.status == 'active' or sys.status == 'locked' %}success{% elif sys.status == 'charging' %}warning{% else %}danger{% endif %}">
-                                {{ sys.status }}
-                            </span>
-                        </td>
-                        <td style="color: rgba(255,255,255,0.6);">
-                            {% if sys.cameras %}{{ sys.cameras }} Cameras{% endif %}
-                            {% if sys.battery %}Battery: {{ sys.battery }}%{% endif %}
-                            {% if sys.blocked %}{{ sys.blocked }} blocked{% endif %}
-                            {% if sys.files %}{{ sys.files }} files{% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-    {% endblock %}
+    <div class="card"><h3 style="margin-bottom:16px">🖥️ System Status</h3><table><thead><tr><th>System</th><th>Status</th><th>Details</th></tr></thead><tbody>{rows}</tbody></table></div>
     '''
-    return render_template_string(BASE_TEMPLATE + content, 
-                                  title="DedSec Security", 
-                                  active_page="dedsec",
-                                  systems=DEDSEC_SYSTEMS)
+    return render_page(content, title="DedSec", active_page="dedsec")
 
 @app.route('/dedsec/tower')
 @login_required
 def dedsec_tower():
     content = '''
-    {% extends "base" %}
-    {% block content %}
-    <div class="page-header">
-        <div>
-            <h1 class="page-title" style="color: #00D4FF;">🗼 Command Tower</h1>
-            <p class="page-subtitle">Zentrale Überwachung Frankfurt</p>
-        </div>
-        <div class="badge badge-success pulse">● LIVE</div>
-    </div>
-    
-    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px;">
-        <div class="card dedsec-card">
-            <div class="card-title">📍 Live Map</div>
-            <div style="height: 400px; background: linear-gradient(135deg, #0d1117, #161b22); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #00D4FF;">
-                <div style="text-align: center;">
-                    <div style="font-size: 64px; margin-bottom: 16px;">🗺️</div>
-                    <div>Live Security Map</div>
-                    <div style="font-size: 12px; color: rgba(255,255,255,0.5);">24 Kameras | 2 Drohnen aktiv</div>
-                </div>
-            </div>
-        </div>
-        
-        <div>
-            <div class="card dedsec-card" style="margin-bottom: 24px;">
-                <div class="card-title">⚡ Quick Actions</div>
-                <button class="btn btn-primary" style="width: 100%; margin-bottom: 12px;">🚨 Alarm aktivieren</button>
-                <button class="btn btn-secondary" style="width: 100%; margin-bottom: 12px;">🔒 Lockdown</button>
-                <button class="btn btn-secondary" style="width: 100%;">📹 Alle Kameras</button>
-            </div>
-            
-            <div class="card dedsec-card">
-                <div class="card-title">📊 Statistiken heute</div>
-                <div style="padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
-                    <div style="display: flex; justify-content: space-between;">
-                        <span>Bewegungen erkannt</span>
-                        <span style="color: #00D4FF;">47</span>
-                    </div>
-                </div>
-                <div style="padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
-                    <div style="display: flex; justify-content: space-between;">
-                        <span>Alerts</span>
-                        <span style="color: #00FF41;">0</span>
-                    </div>
-                </div>
-                <div style="padding: 12px 0;">
-                    <div style="display: flex; justify-content: space-between;">
-                        <span>System Health</span>
-                        <span style="color: #00FF41;">100%</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    {% endblock %}
+    <div class="header"><div><h1 class="page-title">🗼 Command Tower</h1><p class="page-sub">Zentrale Überwachung Frankfurt</p></div><span class="badge badge-success">● LIVE</span></div>
+    <div class="grid-2"><div class="card" style="border:1px solid rgba(0,188,212,0.3)"><h3 style="margin-bottom:16px">📍 Live Map</h3><div style="background:rgba(0,0,0,0.3);border-radius:8px;height:350px;display:flex;align-items:center;justify-content:center"><div style="text-align:center"><div style="font-size:48px;margin-bottom:12px">🗺️</div><div style="color:#00BCD4">Live Security Map</div><div style="font-size:12px;color:rgba(255,255,255,0.5)">24 Kameras | 2 Drohnen</div></div></div></div>
+    <div><div class="card" style="margin-bottom:16px;border:1px solid rgba(255,87,34,0.3)"><h3 style="margin-bottom:12px">⚡ Quick Actions</h3><button class="btn btn-danger" style="width:100%;margin-bottom:8px">🚨 Alarm</button><button class="btn btn-secondary" style="width:100%;margin-bottom:8px">🔒 Lockdown</button><button class="btn btn-secondary" style="width:100%">📹 Alle Kameras</button></div>
+    <div class="card" style="border:1px solid rgba(76,175,80,0.3)"><h3 style="margin-bottom:12px">📊 Heute</h3><div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05)"><span>Bewegungen</span><span style="color:#2196F3">47</span></div><div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05)"><span>Alerts</span><span style="color:#4CAF50">0</span></div><div style="display:flex;justify-content:space-between;padding:8px 0"><span>Health</span><span style="color:#4CAF50">100%</span></div></div></div></div>
     '''
-    return render_template_string(BASE_TEMPLATE + content, 
-                                  title="Command Tower", 
-                                  active_page="tower")
+    return render_page(content, title="Tower", active_page="tower")
 
 @app.route('/dedsec/drones')
 @login_required
 def dedsec_drones():
     content = '''
-    {% extends "base" %}
-    {% block content %}
-    <div class="page-header">
-        <div>
-            <h1 class="page-title" style="color: #00D4FF;">🚁 Drone Control</h1>
-            <p class="page-subtitle">Autonome Patrouillen-Drohnen</p>
-        </div>
+    <div class="header"><div><h1 class="page-title">🚁 Drone Control</h1><p class="page-sub">Autonome Patrouille</p></div></div>
+    <div class="grid-2">
+        <div class="card" style="border:1px solid rgba(76,175,80,0.3)"><div style="display:flex;justify-content:space-between;margin-bottom:16px"><h3>Patrol Drone Alpha</h3><span class="badge badge-success">● Active</span></div><div style="text-align:center;margin-bottom:16px;font-size:48px">🚁</div><div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Battery</span><span style="color:#4CAF50">87%</span></div><div class="progress"><div class="progress-bar" style="width:87%;background:#4CAF50"></div></div></div><div style="display:flex;justify-content:space-between;padding:8px 0;border-top:1px solid rgba(255,255,255,0.1)"><span>Location</span><span>Sector A</span></div><div style="display:flex;justify-content:space-between;padding:8px 0"><span>Flight Time</span><span>2h 34m</span></div><button class="btn btn-primary" style="width:100%;margin-top:12px">📍 Track Live</button></div>
+        <div class="card" style="border:1px solid rgba(255,152,0,0.3)"><div style="display:flex;justify-content:space-between;margin-bottom:16px"><h3>Patrol Drone Beta</h3><span class="badge badge-warning">● Charging</span></div><div style="text-align:center;margin-bottom:16px;font-size:48px">🔋</div><div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Battery</span><span style="color:#FF9800">23%</span></div><div class="progress"><div class="progress-bar" style="width:23%;background:#FF9800"></div></div></div><div style="display:flex;justify-content:space-between;padding:8px 0;border-top:1px solid rgba(255,255,255,0.1)"><span>Location</span><span>Base Station</span></div><div style="display:flex;justify-content:space-between;padding:8px 0"><span>ETA Full</span><span>45 min</span></div><button class="btn btn-secondary" style="width:100%;margin-top:12px">⏳ Charging...</button></div>
     </div>
-    
-    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px;">
-        <div class="card dedsec-card">
-            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 20px;">
-                <div>
-                    <div class="card-title">Patrol Drone Alpha</div>
-                    <span class="badge badge-success">● Active</span>
-                </div>
-                <div style="font-size: 48px;">🚁</div>
-            </div>
-            <div style="padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
-                <div style="display: flex; justify-content: space-between;">
-                    <span>Battery</span>
-                    <span style="color: #00FF41;">87%</span>
-                </div>
-                <div class="progress-bar" style="margin-top: 8px;">
-                    <div class="progress-fill" style="width: 87%; background: linear-gradient(90deg, #00D4FF, #00FF41);"></div>
-                </div>
-            </div>
-            <div style="padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
-                <div style="display: flex; justify-content: space-between;">
-                    <span>Location</span>
-                    <span>Sector A</span>
-                </div>
-            </div>
-            <div style="padding: 12px 0;">
-                <div style="display: flex; justify-content: space-between;">
-                    <span>Flight Time</span>
-                    <span>2h 34m</span>
-                </div>
-            </div>
-            <button class="btn btn-secondary" style="width: 100%; margin-top: 16px;">📍 Track Live</button>
-        </div>
-        
-        <div class="card dedsec-card">
-            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 20px;">
-                <div>
-                    <div class="card-title">Patrol Drone Beta</div>
-                    <span class="badge badge-warning">● Charging</span>
-                </div>
-                <div style="font-size: 48px;">🔋</div>
-            </div>
-            <div style="padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
-                <div style="display: flex; justify-content: space-between;">
-                    <span>Battery</span>
-                    <span style="color: #FF9800;">23%</span>
-                </div>
-                <div class="progress-bar" style="margin-top: 8px;">
-                    <div class="progress-fill" style="width: 23%; background: linear-gradient(90deg, #FF9800, #FFC107);"></div>
-                </div>
-            </div>
-            <div style="padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
-                <div style="display: flex; justify-content: space-between;">
-                    <span>Location</span>
-                    <span>Base Station</span>
-                </div>
-            </div>
-            <div style="padding: 12px 0;">
-                <div style="display: flex; justify-content: space-between;">
-                    <span>ETA Full</span>
-                    <span>45 min</span>
-                </div>
-            </div>
-            <button class="btn btn-secondary" style="width: 100%; margin-top: 16px;" disabled>⏳ Charging...</button>
-        </div>
-    </div>
-    {% endblock %}
     '''
-    return render_template_string(BASE_TEMPLATE + content, 
-                                  title="Drone Control", 
-                                  active_page="drones")
+    return render_page(content, title="Drones", active_page="drones")
 
 @app.route('/dedsec/cctv')
 @login_required
 def dedsec_cctv():
-    content = '''
-    {% extends "base" %}
-    {% block content %}
-    <div class="page-header">
-        <div>
-            <h1 class="page-title" style="color: #00D4FF;">📹 CCTV Network</h1>
-            <p class="page-subtitle">24 Kameras | Live Überwachung</p>
-        </div>
-        <div class="badge badge-success pulse">● 24/24 Online</div>
-    </div>
+    cams = ''
+    sectors = ['A','A','B','B','C','C','D','D']
+    for i in range(8):
+        cams += f'<div class="card" style="padding:0;overflow:hidden"><div style="background:linear-gradient(135deg,rgba(0,188,212,0.2),rgba(0,150,136,0.1));height:80px;display:flex;align-items:center;justify-content:center"><div style="font-size:28px;opacity:0.5">📹</div></div><div style="padding:10px"><div style="font-weight:600;font-size:12px">CAM-0{i+1}</div><div style="font-size:10px;color:rgba(255,255,255,0.5)">Sector {sectors[i]}</div><span class="badge badge-success" style="margin-top:6px;font-size:9px">● Live</span></div></div>'
     
-    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;">
-        {% for i in range(1, 9) %}
-        <div class="card dedsec-card" style="padding: 0; overflow: hidden;">
-            <div style="height: 120px; background: linear-gradient(135deg, #0d1117, #161b22); display: flex; align-items: center; justify-content: center;">
-                <span style="font-size: 32px;">📹</span>
-            </div>
-            <div style="padding: 12px;">
-                <div style="font-weight: 600; font-size: 14px;">CAM-{{ "%02d"|format(i) }}</div>
-                <div style="font-size: 12px; color: rgba(255,255,255,0.5);">Sector {{ ['A', 'A', 'B', 'B', 'C', 'C', 'D', 'D'][i-1] }}</div>
-                <span class="badge badge-success" style="margin-top: 8px; font-size: 10px;">● Live</span>
-            </div>
-        </div>
-        {% endfor %}
-    </div>
-    {% endblock %}
+    content = f'''
+    <div class="header"><div><h1 class="page-title">📹 CCTV Network</h1><p class="page-sub">24 Kameras | Live</p></div><span class="badge badge-success">● 24/24 Online</span></div>
+    <div class="grid-4">{cams}</div>
     '''
-    return render_template_string(BASE_TEMPLATE + content, 
-                                  title="CCTV", 
-                                  active_page="cctv")
+    return render_page(content, title="CCTV", active_page="cctv")
 
 # ============================================================================
-# ROUTES - OTHER MODULES
+# WHATSAPP
 # ============================================================================
 @app.route('/whatsapp')
 @login_required
 def whatsapp():
     content = '''
-    {% extends "base" %}
-    {% block content %}
-    <div class="page-header">
-        <div>
-            <h1 class="page-title">💬 WhatsApp Business</h1>
-            <p class="page-subtitle">Kunden-Kommunikation & Kampagnen</p>
-        </div>
-    </div>
-    
-    <div class="stats-grid">
-        <div class="stat-card" style="background: linear-gradient(135deg, rgba(37,211,102,0.2), rgba(37,211,102,0.05)); border-color: rgba(37,211,102,0.3);">
-            <div class="stat-value" style="color: #25D366;">1,247</div>
-            <div class="stat-label">Kontakte</div>
-        </div>
-        <div class="stat-card" style="background: linear-gradient(135deg, rgba(37,211,102,0.2), rgba(37,211,102,0.05)); border-color: rgba(37,211,102,0.3);">
-            <div class="stat-value" style="color: #25D366;">89%</div>
-            <div class="stat-label">Open Rate</div>
-        </div>
-        <div class="stat-card" style="background: linear-gradient(135deg, rgba(37,211,102,0.2), rgba(37,211,102,0.05)); border-color: rgba(37,211,102,0.3);">
-            <div class="stat-value" style="color: #25D366;">12</div>
-            <div class="stat-label">Aktive Kampagnen</div>
-        </div>
-    </div>
-    
-    <div class="card">
-        <div class="card-title">📱 WhatsApp Integration Status</div>
-        <p style="color: rgba(255,255,255,0.6); margin-bottom: 20px;">Verbinden Sie Ihre WhatsApp Business API für automatisierte Kundenkommunikation.</p>
-        <button class="btn btn-primary" style="background: linear-gradient(135deg, #25D366, #128C7E);">🔗 WhatsApp verbinden</button>
-    </div>
-    {% endblock %}
+    <div class="header"><div><h1 class="page-title">💬 WhatsApp Business</h1><p class="page-sub">Kommunikation & Kampagnen</p></div></div>
+    <div class="stats"><div class="stat" style="border-left:3px solid #25D366"><div class="stat-value" style="color:#25D366">1,247</div><div class="stat-label">Kontakte</div></div>
+    <div class="stat" style="border-left:3px solid #4CAF50"><div class="stat-value" style="color:#4CAF50">89%</div><div class="stat-label">Open Rate</div></div>
+    <div class="stat" style="border-left:3px solid #FF9800"><div class="stat-value" style="color:#FF9800">12</div><div class="stat-label">Kampagnen</div></div></div>
+    <div class="card"><h3 style="margin-bottom:16px">🔗 Quick Actions</h3><div class="grid-3"><a href="/whatsapp/consent" class="btn btn-primary" style="text-align:center;padding:20px;justify-content:center">✅ Consent Manager</a><a href="#" class="btn btn-secondary" style="text-align:center;padding:20px;justify-content:center">📧 Kampagnen</a><a href="#" class="btn btn-secondary" style="text-align:center;padding:20px;justify-content:center">📝 Templates</a></div></div>
     '''
-    return render_template_string(BASE_TEMPLATE + content, 
-                                  title="WhatsApp", 
-                                  active_page="whatsapp")
+    return render_page(content, title="WhatsApp", active_page="whatsapp")
 
+@app.route('/whatsapp/consent')
+@login_required
+def whatsapp_consent():
+    contacts = hubspot.get_contacts(200)
+    rows = ''
+    for c in contacts[:50]:
+        p = c.get('properties',{})
+        name = f"{p.get('firstname','')} {p.get('lastname','')}".strip() or 'Unbekannt'
+        consent = p.get('hs_whatsapp_consent','unknown')
+        cc = {'granted':('#4CAF50','Erteilt'),'revoked':('#f44336','Widerrufen')}.get(consent,('#FF9800','Unbekannt'))
+        rows += f'<tr><td><input type="checkbox" class="cb" data-id="{c.get("id")}" onchange="upd()"></td><td style="font-weight:500">{name}</td><td style="color:rgba(255,255,255,0.7)">{p.get("email","-")}</td><td style="color:rgba(255,255,255,0.7)">{p.get("phone","-")}</td><td><span class="badge" style="background:{cc[0]}22;color:{cc[0]}">{cc[1]}</span></td></tr>'
+    
+    content = f'''
+    <div class="header"><div><h1 class="page-title">✅ WhatsApp Consent</h1><p class="page-sub">Bulk-Update Einwilligungen</p></div>
+    <div style="display:flex;gap:10px"><button onclick="bulk('granted')" class="btn btn-success">✅ Consent erteilen</button><button onclick="bulk('revoked')" class="btn btn-danger">❌ Widerrufen</button></div></div>
+    <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid rgba(255,255,255,0.1)"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="all" onchange="toggle()"><span>Alle auswählen</span></label><span style="color:rgba(255,255,255,0.5)"><span id="cnt">0</span> von {len(contacts)} ausgewählt</span></div>
+    <table><thead><tr><th></th><th>Name</th><th>Email</th><th>Telefon</th><th>Status</th></tr></thead><tbody>{rows}</tbody></table></div>
+    <script>function toggle(){{document.querySelectorAll('.cb').forEach(c=>c.checked=document.getElementById('all').checked);upd()}}function upd(){{document.getElementById('cnt').textContent=document.querySelectorAll('.cb:checked').length}}
+    async function bulk(s){{const ids=Array.from(document.querySelectorAll('.cb:checked')).map(c=>c.dataset.id);if(!ids.length){{alert('Bitte auswählen');return}}if(!confirm('Consent für '+ids.length+' Kontakte auf "'+s+'" setzen?'))return;const r=await fetch('/api/whatsapp/consent/bulk',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{contact_ids:ids,status:s}})}});const d=await r.json();alert('Erfolgreich: '+d.success+', Fehler: '+d.failed);location.reload()}}</script>
+    '''
+    return render_page(content, title="Consent", active_page="consent")
+
+@app.route('/api/whatsapp/consent/bulk', methods=['POST'])
+@login_required
+def api_consent_bulk():
+    data = request.json
+    result = hubspot.bulk_update_consent(data.get('contact_ids',[]), data.get('status','granted'))
+    return jsonify(result)
+
+# ============================================================================
+# GOD BOT
+# ============================================================================
 @app.route('/godbot')
 @login_required
 def godbot():
     content = '''
-    {% extends "base" %}
-    {% block content %}
-    <div class="page-header">
-        <div>
-            <h1 class="page-title">🤖 GOD BOT AI</h1>
-            <p class="page-subtitle">Ihr intelligenter Business-Assistent</p>
-        </div>
-    </div>
-    
-    <div class="card" style="background: linear-gradient(135deg, rgba(255,215,0,0.1), rgba(255,87,34,0.05)); border-color: rgba(255,215,0,0.3);">
-        <div style="text-align: center; padding: 60px 20px;">
-            <div style="font-size: 80px; margin-bottom: 24px;">🤖</div>
-            <h2 style="font-size: 28px; margin-bottom: 12px;">GOD MODE ACTIVATED</h2>
-            <p style="color: rgba(255,255,255,0.6); margin-bottom: 32px;">Ultra Instinct AI Assistant - Bereit für Ihre Befehle</p>
-            
-            <div style="max-width: 600px; margin: 0 auto;">
-                <div style="display: flex; gap: 12px;">
-                    <input type="text" placeholder="Frag GOD BOT etwas..." style="flex: 1; padding: 16px 20px; border-radius: 12px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; font-size: 16px;">
-                    <button class="btn btn-primary" style="background: linear-gradient(135deg, #FFD700, #FF5722);">⚡ Senden</button>
-                </div>
-            </div>
-            
-            <div style="margin-top: 40px; display: flex; justify-content: center; gap: 16px; flex-wrap: wrap;">
-                <span class="badge badge-warning">💡 "Analysiere meine Pipeline"</span>
-                <span class="badge badge-warning">📧 "Schreibe eine E-Mail an Loxone"</span>
-                <span class="badge badge-warning">📊 "Erstelle einen Report"</span>
-            </div>
-        </div>
-    </div>
-    {% endblock %}
+    <div class="header"><div><h1 class="page-title">🤖 GOD BOT AI</h1><p class="page-sub">Ultra Instinct Assistant - Claude</p></div></div>
+    <div class="card" style="min-height:500px;display:flex;flex-direction:column"><div id="chat" style="flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:16px"><div style="text-align:center;padding:40px"><div style="font-size:64px;margin-bottom:16px">🤖</div><h2 style="margin-bottom:8px">GOD MODE ACTIVATED</h2><p style="color:rgba(255,255,255,0.5)">Ultra Instinct AI - Bereit für Ihre Befehle</p></div></div>
+    <div style="border-top:1px solid rgba(255,255,255,0.1);padding:16px;display:flex;gap:12px"><input type="text" id="inp" placeholder="Frag GOD BOT..." style="flex:1" onkeypress="if(event.key==='Enter')send()"><button onclick="send()" class="btn btn-primary">🚀 Senden</button></div></div>
+    <script>async function send(){const i=document.getElementById('inp'),m=i.value.trim();if(!m)return;const c=document.getElementById('chat');c.innerHTML+=`<div style="align-self:flex-end;background:linear-gradient(90deg,#FF5722,#FF9800);padding:12px 16px;border-radius:12px 12px 0 12px;max-width:70%">${m}</div>`;i.value='';c.innerHTML+=`<div id="ld" style="align-self:flex-start;color:rgba(255,255,255,0.5)">🤖 GOD BOT denkt...</div>`;c.scrollTop=c.scrollHeight;const r=await fetch('/api/godbot/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:m})});const d=await r.json();document.getElementById('ld').remove();c.innerHTML+=`<div style="align-self:flex-start;background:rgba(255,255,255,0.1);padding:12px 16px;border-radius:12px 12px 12px 0;max-width:70%">${d.response}</div>`;c.scrollTop=c.scrollHeight}</script>
     '''
-    return render_template_string(BASE_TEMPLATE + content, 
-                                  title="GOD BOT", 
-                                  active_page="godbot")
+    return render_page(content, title="GOD BOT", active_page="godbot")
 
+@app.route('/api/godbot/chat', methods=['POST'])
+@login_required
+def api_godbot_chat():
+    data = request.json
+    system = "Du bist GOD BOT, der Ultra Instinct AI Assistant von West Money OS. Du hilfst bei CRM, Leads, Projekten, Smart Home, PV. Antworte professionell auf Deutsch."
+    response = claude.chat(data.get('message',''), system)
+    return jsonify({'response': response})
+
+# ============================================================================
+# LOCKER
+# ============================================================================
 @app.route('/locker')
 @login_required
 def locker():
     content = '''
-    {% extends "base" %}
-    {% block content %}
-    <div class="page-header">
-        <div>
-            <h1 class="page-title">🔐 Private Locker</h1>
-            <p class="page-subtitle">Sichere Dokumenten-Ablage</p>
-        </div>
-        <button class="btn btn-primary">📤 Upload</button>
-    </div>
-    
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-value">892</div>
-            <div class="stat-label">Dokumente</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-value">45</div>
-            <div class="stat-label">Verträge</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-value">128</div>
-            <div class="stat-label">Rechnungen</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-value">2.4 GB</div>
-            <div class="stat-label">Speicher genutzt</div>
-        </div>
-    </div>
-    
-    <div class="card">
-        <div class="card-title">📁 Ordner</div>
-        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;">
-            <div style="padding: 24px; background: rgba(255,255,255,0.05); border-radius: 12px; text-align: center; cursor: pointer;">
-                <div style="font-size: 40px; margin-bottom: 8px;">📄</div>
-                <div>Dokumente</div>
-                <div style="font-size: 12px; color: rgba(255,255,255,0.5);">892 Dateien</div>
-            </div>
-            <div style="padding: 24px; background: rgba(255,255,255,0.05); border-radius: 12px; text-align: center; cursor: pointer;">
-                <div style="font-size: 40px; margin-bottom: 8px;">📝</div>
-                <div>Verträge</div>
-                <div style="font-size: 12px; color: rgba(255,255,255,0.5);">45 Dateien</div>
-            </div>
-            <div style="padding: 24px; background: rgba(255,255,255,0.05); border-radius: 12px; text-align: center; cursor: pointer;">
-                <div style="font-size: 40px; margin-bottom: 8px;">🧾</div>
-                <div>Rechnungen</div>
-                <div style="font-size: 12px; color: rgba(255,255,255,0.5);">128 Dateien</div>
-            </div>
-            <div style="padding: 24px; background: rgba(255,255,255,0.05); border-radius: 12px; text-align: center; cursor: pointer;">
-                <div style="font-size: 40px; margin-bottom: 8px;">🏗️</div>
-                <div>Projekte</div>
-                <div style="font-size: 12px; color: rgba(255,255,255,0.5);">67 Dateien</div>
-            </div>
-        </div>
-    </div>
-    {% endblock %}
+    <div class="header"><div><h1 class="page-title">🔐 Private Locker</h1><p class="page-sub">Sichere Dokumenten-Ablage</p></div><button class="btn btn-primary">📤 Upload</button></div>
+    <div class="stats"><div class="stat" style="border-left:3px solid #FF5722"><div class="stat-value" style="color:#FF5722">892</div><div class="stat-label">Dokumente</div></div>
+    <div class="stat" style="border-left:3px solid #9C27B0"><div class="stat-value" style="color:#9C27B0">45</div><div class="stat-label">Verträge</div></div>
+    <div class="stat" style="border-left:3px solid #2196F3"><div class="stat-value" style="color:#2196F3">128</div><div class="stat-label">Rechnungen</div></div>
+    <div class="stat" style="border-left:3px solid #4CAF50"><div class="stat-value" style="color:#4CAF50">2.4 GB</div><div class="stat-label">Speicher</div></div></div>
+    <div class="card"><h3 style="margin-bottom:16px">📁 Ordner</h3><div class="grid-4">
+    <div style="text-align:center;padding:20px;background:rgba(255,255,255,0.03);border-radius:8px;cursor:pointer"><div style="font-size:40px;margin-bottom:8px">📄</div><div style="font-weight:500">Dokumente</div><div style="font-size:12px;color:rgba(255,255,255,0.5)">892 Dateien</div></div>
+    <div style="text-align:center;padding:20px;background:rgba(255,255,255,0.03);border-radius:8px;cursor:pointer"><div style="font-size:40px;margin-bottom:8px">📋</div><div style="font-weight:500">Verträge</div><div style="font-size:12px;color:rgba(255,255,255,0.5)">45 Dateien</div></div>
+    <div style="text-align:center;padding:20px;background:rgba(255,255,255,0.03);border-radius:8px;cursor:pointer"><div style="font-size:40px;margin-bottom:8px">💰</div><div style="font-weight:500">Rechnungen</div><div style="font-size:12px;color:rgba(255,255,255,0.5)">128 Dateien</div></div>
+    <div style="text-align:center;padding:20px;background:rgba(255,255,255,0.03);border-radius:8px;cursor:pointer"><div style="font-size:40px;margin-bottom:8px">🏗️</div><div style="font-weight:500">Projekte</div><div style="font-size:12px;color:rgba(255,255,255,0.5)">67 Dateien</div></div>
+    </div></div>
     '''
-    return render_template_string(BASE_TEMPLATE + content, 
-                                  title="Private Locker", 
-                                  active_page="locker")
+    return render_page(content, title="Locker", active_page="locker")
 
-@app.route('/dashboard/projects')
+# ============================================================================
+# SETTINGS & SYNC
+# ============================================================================
+@app.route('/settings')
 @login_required
-def projects():
-    content = '''
-    {% extends "base" %}
-    {% block content %}
-    <div class="page-header">
-        <div>
-            <h1 class="page-title">🏗️ Projekte</h1>
-            <p class="page-subtitle">Aktive Bauprojekte & Smart Home Installationen</p>
-        </div>
-        <button class="btn btn-primary">➕ Neues Projekt</button>
-    </div>
+def settings():
+    apis = [('HubSpot CRM', CONFIG['HUBSPOT_API_KEY']), ('Stripe', CONFIG['STRIPE_SECRET_KEY']), ('SevDesk', CONFIG['SEVDESK_API_KEY']), ('Claude AI', CONFIG['ANTHROPIC_API_KEY']), ('WhatsApp', CONFIG['WHATSAPP_TOKEN'])]
+    rows = ''
+    for n, k in apis:
+        has = bool(k and len(k)>10)
+        rows += f'<tr><td style="font-weight:500">{n}</td><td><span class="badge {"badge-success" if has else "badge-danger"}">{"Verbunden" if has else "Nicht konfiguriert"}</span></td><td style="color:rgba(255,255,255,0.5);font-family:monospace">{k[:20]+"..." if has else "-"}</td></tr>'
     
-    <div class="card">
-        <p style="text-align: center; padding: 60px; color: rgba(255,255,255,0.6);">
-            <span style="font-size: 48px; display: block; margin-bottom: 16px;">🏗️</span>
-            Projektmanagement-Modul wird geladen...
-        </p>
-    </div>
-    {% endblock %}
+    content = f'''
+    <div class="header"><div><h1 class="page-title">⚙️ Settings</h1><p class="page-sub">System-Konfiguration</p></div></div>
+    <div class="card"><h3 style="margin-bottom:16px">🔑 API Keys</h3><table><thead><tr><th>Service</th><th>Status</th><th>Key</th></tr></thead><tbody>{rows}</tbody></table></div>
+    <div class="card"><h3 style="margin-bottom:16px">📝 Hinweis</h3><p style="color:rgba(255,255,255,0.7)">API Keys in <code>.env</code> konfigurieren. Neustart erforderlich.</p></div>
     '''
-    return render_template_string(BASE_TEMPLATE + content, 
-                                  title="Projekte", 
-                                  active_page="projects")
+    return render_page(content, title="Settings", active_page="settings")
+
+@app.route('/sync')
+@login_required
+def sync():
+    content = '''
+    <div class="header"><div><h1 class="page-title">🔄 API Sync</h1><p class="page-sub">Daten synchronisieren</p></div></div>
+    <div class="grid-3">
+        <div class="card"><h3 style="margin-bottom:12px">📧 HubSpot</h3><p style="color:rgba(255,255,255,0.5);margin-bottom:16px;font-size:13px">Kontakte & Deals sync</p><button onclick="syncAPI('hubspot')" class="btn btn-primary" style="width:100%">🔄 Sync</button><div id="hubspot-r" style="margin-top:12px"></div></div>
+        <div class="card"><h3 style="margin-bottom:12px">💳 Stripe</h3><p style="color:rgba(255,255,255,0.5);margin-bottom:16px;font-size:13px">Zahlungen abrufen</p><button onclick="syncAPI('stripe')" class="btn btn-primary" style="width:100%">🔄 Sync</button><div id="stripe-r" style="margin-top:12px"></div></div>
+        <div class="card"><h3 style="margin-bottom:12px">📄 SevDesk</h3><p style="color:rgba(255,255,255,0.5);margin-bottom:16px;font-size:13px">Rechnungen import</p><button onclick="syncAPI('sevdesk')" class="btn btn-primary" style="width:100%">🔄 Sync</button><div id="sevdesk-r" style="margin-top:12px"></div></div>
+    </div>
+    <script>async function syncAPI(t){document.getElementById(t+'-r').innerHTML='<span style="color:#FF9800">Synchronisiere...</span>';const r=await fetch('/api/sync/'+t,{method:'POST'});const d=await r.json();document.getElementById(t+'-r').innerHTML='<span style="color:#4CAF50">✅ '+JSON.stringify(d)+'</span>'}</script>
+    '''
+    return render_page(content, title="API Sync", active_page="sync")
+
+@app.route('/api/sync/hubspot', methods=['POST'])
+@login_required
+def api_sync_hubspot():
+    synced = hubspot.sync_to_db()
+    return jsonify({'synced': synced})
+
+@app.route('/api/sync/stripe', methods=['POST'])
+@login_required
+def api_sync_stripe():
+    return jsonify({'balance': stripe_api.get_balance(), 'revenue': stripe_api.get_revenue()})
+
+@app.route('/api/sync/sevdesk', methods=['POST'])
+@login_required
+def api_sync_sevdesk():
+    return jsonify({'invoices': len(sevdesk.get_invoices()), 'total': sevdesk.get_total()})
 
 # ============================================================================
 # API ENDPOINTS
 # ============================================================================
-@app.route('/api/v1/leads')
-def api_leads():
-    return jsonify({"success": True, "data": LEADS_DATA, "count": len(LEADS_DATA)})
-
-@app.route('/api/v1/predictions')
-def api_predictions():
-    return jsonify({"success": True, "data": EINSTEIN_PREDICTIONS})
-
-@app.route('/api/v1/security/status')
-def api_security():
-    return jsonify({"success": True, "data": DEDSEC_SYSTEMS})
-
 @app.route('/api/v1/health')
 def api_health():
-    return jsonify({
-        "status": "healthy",
-        "version": "13.0",
-        "timestamp": datetime.now().isoformat(),
-        "modules": {
-            "dashboard": "online",
-            "einstein": "online",
-            "dedsec": "online",
-            "whatsapp": "online",
-            "godbot": "online",
-            "locker": "online"
-        }
-    })
+    return jsonify({'status': 'healthy', 'version': 'v15.369', 'timestamp': datetime.now().isoformat()})
+
+@app.route('/api/v1/stats')
+@login_required
+def api_stats():
+    return jsonify({'contacts': len(hubspot.get_contacts(500)), 'deals': len(hubspot.get_deals(500)), 'stripe': stripe_api.get_balance(), 'sevdesk': sevdesk.get_total()})
 
 # ============================================================================
 # MAIN
 # ============================================================================
 if __name__ == '__main__':
+    print('''
+╔══════════════════════════════════════════════════════════════════════════════╗
+║   🔥 WEST MONEY OS v15.369 - ULTIMATE EDITION                               ║
+║   Enterprise Universe GmbH | CEO: Ömer Hüseyin Coşkun                        ║
+║   Launch: 01.01.2026                                                         ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+    ''')
+    init_db()
+    print("🔐 Login: admin / admin123")
+    print("🌐 Server: http://0.0.0.0:5000")
     app.run(host='0.0.0.0', port=5000, debug=False)

@@ -1,165 +1,131 @@
-# 💰 West Money OS v11.0 ULTIMATE GODMODE
+# 🔥 WEST MONEY OS v15.369 - ULTIMATE EDITION
 
-> Enterprise Business Platform by Enterprise Universe GmbH
+**Enterprise Universe GmbH** | CEO: Ömer Hüseyin Coşkun  
+**Launch Date:** 01.01.2026
 
-[![Deploy](https://github.com/YOUR_USERNAME/westmoney/actions/workflows/deploy.yml/badge.svg)](https://github.com/YOUR_USERNAME/westmoney/actions/workflows/deploy.yml)
-[![License](https://img.shields.io/badge/license-Proprietary-red.svg)]()
-[![Python](https://img.shields.io/badge/python-3.11+-blue.svg)]()
+---
 
-## 🚀 Features
+## 📋 Features
 
-### Core CRM
-- 👥 **Kontakte** - Full CRUD with search & filters
-- 🎯 **Leads** - Kanban pipeline (6 stages)
-- 📧 **Kampagnen** - Marketing automation
-- 📄 **Rechnungen** - Billing & invoicing
+### Main Modules
+- **Dashboard** - Live KPIs, Pipeline Overview, Activity Feed
+- **Lead Management** - HubSpot Sync, Scoring, Stages
+- **Contacts** - CRM Integration, WhatsApp Consent
+- **Projects** - Bauprojekte, Smart Home, LOXONE/KNX
+- **Invoices** - SevDesk Integration
 
-### Power Modules
-- 🤖 **AI Chat** - Claude AI integration
-- 💪 **Broly Taskforce** - LEGENDARY automation engine
-- 🧠 **Einstein Agency** - 8 genius AI bots
-- 🔐 **DedSec Security** - Enterprise security monitoring
-- 🪙 **Token Economy** - GOD, DEDSEC, OG, TOWER tokens
+### Einstein AI
+- **Predictions** - ML-basierte Lead Scoring
+- **Analytics** - Deep Learning Datenanalyse  
+- **Insights** - Automatische Empfehlungen
 
-### Communication
-- 📱 **WhatsApp Business** - Full API integration + OTP Auth
-- 🏠 **LOXONE** - Smart home control
+### Photovoltaik ☀️
+- **PV Home** - Solar Dashboard
+- **Partner** - 1Komma5°, Enpal, Zolar, Solarwatt
+- **PV Rechner** - ROI & Amortisation
 
-### Compliance (DSGVO)
-- ✅ Impressum, Datenschutz, AGB, Widerruf
-- ✅ WhatsApp Consent Management
-- ✅ HubSpot Consent Sync
-- ✅ Data Export (Art. 20)
-- ✅ Account Deletion (Art. 17)
-- ✅ Cookie Consent Banner
+### DedSec Security 🛡️
+- **Security Hub** - System Status
+- **Command Tower** - Zentrale Überwachung
+- **Drone Control** - Patrol Drones
+- **CCTV Network** - 24 Kameras
 
-## 📱 WhatsApp Authentication
+### Tools
+- **WhatsApp Business** - Kommunikation & Kampagnen
+- **Consent Manager** - Bulk-Update Einwilligungen
+- **GOD BOT AI** - Claude-powered Assistant
+- **Private Locker** - Dokumenten-Ablage
 
-Login via WhatsApp OTP:
-```
-/auth/whatsapp → Enter phone → Receive OTP → Verify → Dashboard
-```
+---
 
-## 🔧 Installation
+## 🚀 Quick Start
 
 ```bash
-# Clone
-git clone https://github.com/YOUR_USERNAME/westmoney.git
-cd westmoney
+# Clone/Copy files
+cd /var/www/west-money-os
 
-# Virtual environment
+# Setup Python
 python3 -m venv venv
 source venv/bin/activate
-
-# Dependencies
 pip install -r requirements.txt
 
-# Environment
+# Configure
 cp .env.example .env
-# Edit .env with your API keys
+nano .env  # Add your API keys
 
 # Run
 python app.py
 ```
 
-## ⚙️ Environment Variables
+---
+
+## ⚙️ Configuration
+
+Edit `.env` file:
 
 ```env
-# Required
-SECRET_KEY=your-secret-key
-
-# Optional - APIs
-ANTHROPIC_API_KEY=sk-ant-xxx
-HUBSPOT_API_KEY=pat-xxx
-WHATSAPP_TOKEN=xxx
-WHATSAPP_PHONE_ID=xxx
-WHATSAPP_VERIFY_TOKEN=your_verify_token
-
-# Optional - Payments
-STRIPE_SECRET_KEY=sk_xxx
-REVOLUT_API_KEY=xxx
+HUBSPOT_API_KEY=pat-eu1-xxxxx
+STRIPE_SECRET_KEY=sk_live_xxxxx
+SEVDESK_API_KEY=xxxxx
+ANTHROPIC_API_KEY=sk-ant-xxxxx
+WHATSAPP_TOKEN=xxxxx
 ```
-
-## 🚀 Deployment
-
-### Automatic (GitHub Actions)
-
-1. Add secrets in GitHub:
-   - `SSH_PRIVATE_KEY` - Server SSH key
-   
-2. Push to main branch → Auto deploy
-
-### Manual
-
-```bash
-ssh user@server
-cd /var/www/westmoney
-git pull origin main
-sudo systemctl restart westmoney
-```
-
-## 📊 API Endpoints
-
-### Authentication
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/auth/whatsapp/send-otp` | Send WhatsApp OTP |
-| POST | `/api/auth/whatsapp/verify-otp` | Verify OTP & login |
-
-### Contacts
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/contacts` | List all contacts |
-| POST | `/api/contacts` | Create contact |
-| PUT | `/api/contacts/:id` | Update contact |
-| DELETE | `/api/contacts/:id` | Delete contact |
-| POST | `/api/contacts/whatsapp-consent/bulk` | Bulk consent update |
-
-### HubSpot Integration
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/hubspot/sync-consent` | Sync consent to HubSpot |
-| POST | `/api/hubspot/import-contacts` | Import from HubSpot |
-
-### DSGVO
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/user/data-export` | Export all user data |
-| POST | `/api/user/delete-account` | Delete account & data |
-| GET | `/api/contacts/export-consent-log` | Export consent log |
-
-## 🔐 Security
-
-- Password hashing (Werkzeug/bcrypt)
-- Session-based authentication (30 days)
-- CORS enabled
-- Rate limiting on OTP
-- SQL injection protected (SQLAlchemy ORM)
-
-## 📁 Project Structure
-
-```
-westmoney/
-├── app.py              # Main application (2800+ lines)
-├── requirements.txt    # Python dependencies
-├── .env               # Environment variables
-├── .github/
-│   └── workflows/
-│       └── deploy.yml  # CI/CD pipeline
-└── README.md
-```
-
-## 🏢 Company
-
-**Enterprise Universe GmbH**
-- West Money Bau - Smart Home Construction
-- Z Automation - Building Automation
-- DedSec World AI - AR/VR Security
-
-## 📄 License
-
-Proprietary - © 2025 Enterprise Universe GmbH
 
 ---
 
-Made with 💜 by **Ömer Hüseyin Coşkun**
+## 🖥️ Server Deployment
+
+```bash
+# Copy service file
+sudo cp westmoney.service /etc/systemd/system/
+
+# Enable & Start
+sudo systemctl daemon-reload
+sudo systemctl enable westmoney
+sudo systemctl start westmoney
+
+# Check status
+sudo systemctl status westmoney
+```
+
+---
+
+## 🔐 Default Login
+
+- **Username:** admin
+- **Password:** admin123
+
+---
+
+## 📡 API Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `/api/v1/health` | Health Check |
+| `/api/v1/stats` | System Stats |
+| `/api/sync/hubspot` | Sync HubSpot |
+| `/api/sync/stripe` | Sync Stripe |
+| `/api/sync/sevdesk` | Sync SevDesk |
+| `/api/whatsapp/consent/bulk` | Bulk Consent Update |
+| `/api/godbot/chat` | GOD BOT AI Chat |
+
+---
+
+## 🏗️ Tech Stack
+
+- **Backend:** Python Flask
+- **Database:** SQLite
+- **Frontend:** Vanilla JS, Chart.js
+- **APIs:** HubSpot, Stripe, SevDesk, Claude AI, WhatsApp
+
+---
+
+## 📞 Support
+
+**West Money Bau**  
+Enterprise Universe GmbH  
+CEO: Ömer Hüseyin Coşkun
+
+---
+
+*Powered by GOD MODE ∞ Ultra Instinct* 🤖
