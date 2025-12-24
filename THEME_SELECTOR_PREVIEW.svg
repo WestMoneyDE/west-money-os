@@ -1,0 +1,136 @@
+<svg width="900" height="600" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgCyberMain" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0a0a15"/>
+      <stop offset="50%" style="stop-color:#150a1a"/>
+      <stop offset="100%" style="stop-color:#0a0510"/>
+    </linearGradient>
+    <linearGradient id="neonGradMain" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#ff00ff"/>
+      <stop offset="100%" style="stop-color:#00ffff"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="900" height="600" fill="url(#bgCyberMain)"/>
+  
+  <!-- Header -->
+  <rect x="0" y="0" width="900" height="60" fill="rgba(0,0,0,0.5)"/>
+  <text x="30" y="38" font-size="24">🎨</text>
+  <text x="65" y="40" font-family="Arial Black" font-size="20" fill="url(#neonGradMain)">Theme Selector</text>
+  <text x="250" y="40" font-family="Arial" font-size="14" fill="#888">West Money OS</text>
+  
+  <!-- Title -->
+  <text x="30" y="100" font-family="Arial Black" font-size="28" fill="#fff">🎨 Theme auswählen</text>
+  <text x="30" y="125" font-family="Arial" font-size="14" fill="#666">Wähle dein bevorzugtes Design für West Money OS</text>
+  
+  <!-- Theme Cards Grid -->
+  <!-- Row 1 -->
+  <!-- Cyberpunk (Active) -->
+  <rect x="30" y="150" width="270" height="180" rx="16" fill="rgba(0,0,0,0.3)" stroke="#ff00ff" stroke-width="2"/>
+  <rect x="35" y="155" width="260" height="90" rx="12" fill="linear-gradient(135deg, #0a0a15, #150a1a)"/>
+  <text x="50" y="185" font-size="12">🔐</text>
+  <text x="70" y="187" font-family="Arial" font-size="10" fill="#ff00ff" font-weight="bold">WEST MONEY OS</text>
+  <rect x="50" y="200" width="70" height="35" rx="6" fill="rgba(255,0,255,0.2)" stroke="rgba(255,0,255,0.4)"/>
+  <text x="85" y="222" font-family="Arial" font-size="12" fill="#00ffff" text-anchor="middle" font-weight="bold">1,234</text>
+  <rect x="130" y="200" width="70" height="35" rx="6" fill="rgba(255,0,255,0.2)" stroke="rgba(255,0,255,0.4)"/>
+  <text x="165" y="222" font-family="Arial" font-size="12" fill="#00ffff" text-anchor="middle" font-weight="bold">89</text>
+  <rect x="210" y="200" width="70" height="35" rx="6" fill="rgba(255,0,255,0.2)" stroke="rgba(255,0,255,0.4)"/>
+  <text x="245" y="222" font-family="Arial" font-size="12" fill="#00ffff" text-anchor="middle" font-weight="bold">€847K</text>
+  <text x="50" y="270" font-family="Arial" font-size="16" fill="#fff" font-weight="bold">🎮 Cyberpunk</text>
+  <text x="50" y="290" font-family="Arial" font-size="11" fill="#888">Neon Pink & Cyan - DedSec Style</text>
+  <circle cx="50" y="310" r="8" fill="#ff00ff"/>
+  <circle cx="70" y="310" r="8" fill="#00ffff"/>
+  <circle cx="90" y="310" r="8" fill="#150a1a"/>
+  <rect x="220" y="158" width="60" height="20" rx="10" fill="#ff00ff"/>
+  <text x="250" y="172" font-family="Arial" font-size="9" fill="#000" text-anchor="middle" font-weight="bold">✓ AKTIV</text>
+  
+  <!-- GOD MODE -->
+  <rect x="315" y="150" width="270" height="180" rx="16" fill="rgba(0,0,0,0.3)" stroke="rgba(255,255,255,0.1)" stroke-width="2"/>
+  <rect x="320" y="155" width="260" height="90" rx="12" fill="#1a0a0a"/>
+  <text x="335" y="185" font-size="12">🐉</text>
+  <text x="355" y="187" font-family="Arial" font-size="10" fill="#ff3333" font-weight="bold">WEST MONEY OS</text>
+  <rect x="335" y="200" width="70" height="35" rx="6" fill="rgba(255,0,0,0.2)" stroke="rgba(255,0,0,0.4)"/>
+  <text x="370" y="222" font-family="Arial" font-size="12" fill="#ff4444" text-anchor="middle" font-weight="bold">1,234</text>
+  <rect x="415" y="200" width="70" height="35" rx="6" fill="rgba(255,0,0,0.2)" stroke="rgba(255,0,0,0.4)"/>
+  <text x="450" y="222" font-family="Arial" font-size="12" fill="#ff4444" text-anchor="middle" font-weight="bold">89</text>
+  <rect x="495" y="200" width="70" height="35" rx="6" fill="rgba(255,0,0,0.2)" stroke="rgba(255,0,0,0.4)"/>
+  <text x="530" y="222" font-family="Arial" font-size="12" fill="#ff4444" text-anchor="middle" font-weight="bold">€847K</text>
+  <text x="335" y="270" font-family="Arial" font-size="16" fill="#fff" font-weight="bold">🔥 GOD MODE</text>
+  <text x="335" y="290" font-family="Arial" font-size="11" fill="#888">Rot & Gold - Dragon Ball Super</text>
+  <circle cx="335" y="310" r="8" fill="#ff3333"/>
+  <circle cx="355" y="310" r="8" fill="#ff6600"/>
+  <circle cx="375" y="310" r="8" fill="#2a1010"/>
+  
+  <!-- Ultra Instinct -->
+  <rect x="600" y="150" width="270" height="180" rx="16" fill="rgba(0,0,0,0.3)" stroke="rgba(255,255,255,0.1)" stroke-width="2"/>
+  <rect x="605" y="155" width="260" height="90" rx="12" fill="#0a0a1a"/>
+  <text x="620" y="185" font-size="12">⚡</text>
+  <text x="640" y="187" font-family="Arial" font-size="10" fill="#c0d0ff" font-weight="bold">WEST MONEY OS</text>
+  <rect x="620" y="200" width="70" height="35" rx="6" fill="rgba(180,200,255,0.2)" stroke="rgba(180,200,255,0.3)"/>
+  <text x="655" y="222" font-family="Arial" font-size="12" fill="#a0c0ff" text-anchor="middle" font-weight="bold">1,234</text>
+  <rect x="700" y="200" width="70" height="35" rx="6" fill="rgba(180,200,255,0.2)" stroke="rgba(180,200,255,0.3)"/>
+  <text x="735" y="222" font-family="Arial" font-size="12" fill="#a0c0ff" text-anchor="middle" font-weight="bold">89</text>
+  <rect x="780" y="200" width="70" height="35" rx="6" fill="rgba(180,200,255,0.2)" stroke="rgba(180,200,255,0.3)"/>
+  <text x="815" y="222" font-family="Arial" font-size="12" fill="#a0c0ff" text-anchor="middle" font-weight="bold">€847K</text>
+  <text x="620" y="270" font-family="Arial" font-size="16" fill="#fff" font-weight="bold">❄️ Ultra Instinct</text>
+  <text x="620" y="290" font-family="Arial" font-size="11" fill="#888">Silber & Blau - Clean</text>
+  <circle cx="620" y="310" r="8" fill="#c0d0ff"/>
+  <circle cx="640" y="310" r="8" fill="#8090c0"/>
+  <circle cx="660" y="310" r="8" fill="#101025"/>
+  
+  <!-- Row 2 -->
+  <!-- Broly Rage -->
+  <rect x="30" y="350" width="270" height="180" rx="16" fill="rgba(0,0,0,0.3)" stroke="rgba(255,255,255,0.1)" stroke-width="2"/>
+  <rect x="35" y="355" width="260" height="90" rx="12" fill="#0a1a0a"/>
+  <text x="50" y="385" font-size="12">🐉</text>
+  <text x="70" y="387" font-family="Arial" font-size="10" fill="#00ff44" font-weight="bold">WEST MONEY OS</text>
+  <rect x="50" y="400" width="70" height="35" rx="6" fill="rgba(0,255,0,0.2)" stroke="rgba(0,255,0,0.4)"/>
+  <text x="85" y="422" font-family="Arial" font-size="12" fill="#00ff44" text-anchor="middle" font-weight="bold">1,234</text>
+  <rect x="130" y="400" width="70" height="35" rx="6" fill="rgba(0,255,0,0.2)" stroke="rgba(0,255,0,0.4)"/>
+  <text x="165" y="422" font-family="Arial" font-size="12" fill="#00ff44" text-anchor="middle" font-weight="bold">89</text>
+  <rect x="210" y="400" width="70" height="35" rx="6" fill="rgba(0,255,0,0.2)" stroke="rgba(0,255,0,0.4)"/>
+  <text x="245" y="422" font-family="Arial" font-size="12" fill="#00ff44" text-anchor="middle" font-weight="bold">€847K</text>
+  <text x="50" y="470" font-family="Arial" font-size="16" fill="#fff" font-weight="bold">💚 Broly Rage</text>
+  <text x="50" y="490" font-family="Arial" font-size="11" fill="#888">Neon Grün - Legendary Power</text>
+  <circle cx="50" y="510" r="8" fill="#00ff44"/>
+  <circle cx="70" y="510" r="8" fill="#88ff00"/>
+  <circle cx="90" y="510" r="8" fill="#102510"/>
+  
+  <!-- Enterprise -->
+  <rect x="315" y="350" width="270" height="180" rx="16" fill="rgba(0,0,0,0.3)" stroke="rgba(255,255,255,0.1)" stroke-width="2"/>
+  <rect x="320" y="355" width="260" height="90" rx="12" fill="#0a1525"/>
+  <text x="335" y="385" font-size="12">💼</text>
+  <text x="355" y="387" font-family="Arial" font-size="10" fill="#0099ff" font-weight="bold">WEST MONEY OS</text>
+  <rect x="335" y="400" width="70" height="35" rx="6" fill="rgba(0,150,255,0.2)" stroke="rgba(0,150,255,0.3)"/>
+  <text x="370" y="422" font-family="Arial" font-size="12" fill="#0099ff" text-anchor="middle" font-weight="bold">1,234</text>
+  <rect x="415" y="400" width="70" height="35" rx="6" fill="rgba(0,150,255,0.2)" stroke="rgba(0,150,255,0.3)"/>
+  <text x="450" y="422" font-family="Arial" font-size="12" fill="#0099ff" text-anchor="middle" font-weight="bold">89</text>
+  <rect x="495" y="400" width="70" height="35" rx="6" fill="rgba(0,150,255,0.2)" stroke="rgba(0,150,255,0.3)"/>
+  <text x="530" y="422" font-family="Arial" font-size="12" fill="#0099ff" text-anchor="middle" font-weight="bold">€847K</text>
+  <text x="335" y="470" font-family="Arial" font-size="16" fill="#fff" font-weight="bold">🏢 Enterprise</text>
+  <text x="335" y="490" font-family="Arial" font-size="11" fill="#888">Blau - Professionell & Business</text>
+  <circle cx="335" y="510" r="8" fill="#0099ff"/>
+  <circle cx="355" y="510" r="8" fill="#0066cc"/>
+  <circle cx="375" y="510" r="8" fill="#0a1525"/>
+  
+  <!-- Luxury Gold -->
+  <rect x="600" y="350" width="270" height="180" rx="16" fill="rgba(0,0,0,0.3)" stroke="rgba(255,255,255,0.1)" stroke-width="2"/>
+  <rect x="605" y="355" width="260" height="90" rx="12" fill="#1a1510"/>
+  <text x="620" y="385" font-size="12">👑</text>
+  <text x="640" y="387" font-family="Arial" font-size="10" fill="#ffd700" font-weight="bold">WEST MONEY OS</text>
+  <rect x="620" y="400" width="70" height="35" rx="6" fill="rgba(255,215,0,0.2)" stroke="rgba(255,215,0,0.3)"/>
+  <text x="655" y="422" font-family="Arial" font-size="12" fill="#ffd700" text-anchor="middle" font-weight="bold">1,234</text>
+  <rect x="700" y="400" width="70" height="35" rx="6" fill="rgba(255,215,0,0.2)" stroke="rgba(255,215,0,0.3)"/>
+  <text x="735" y="422" font-family="Arial" font-size="12" fill="#ffd700" text-anchor="middle" font-weight="bold">89</text>
+  <rect x="780" y="400" width="70" height="35" rx="6" fill="rgba(255,215,0,0.2)" stroke="rgba(255,215,0,0.3)"/>
+  <text x="815" y="422" font-family="Arial" font-size="12" fill="#ffd700" text-anchor="middle" font-weight="bold">€847K</text>
+  <text x="620" y="470" font-family="Arial" font-size="16" fill="#fff" font-weight="bold">👑 Luxury Gold</text>
+  <text x="620" y="490" font-family="Arial" font-size="11" fill="#888">Gold & Schwarz - Premium Edition</text>
+  <circle cx="620" y="510" r="8" fill="#ffd700"/>
+  <circle cx="640" y="510" r="8" fill="#ff8c00"/>
+  <circle cx="660" y="510" r="8" fill="#1a1510"/>
+  
+  <!-- Footer -->
+  <text x="450" y="570" font-family="Arial" font-size="12" fill="#666" text-anchor="middle">Klicke auf ein Theme um es zu aktivieren</text>
+</svg>

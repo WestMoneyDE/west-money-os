@@ -31,7 +31,7 @@ CONTACTS_HTML = """
         
         body {
             font-family: 'Segoe UI', system-ui, sans-serif;
-            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            background: linear-gradient(135deg, #0a0a15 0%, #150a1a 50%, #0a0510 100%);
             min-height: 100vh;
             color: #fff;
         }
@@ -63,7 +63,7 @@ CONTACTS_HTML = """
         .logo-text {
             font-size: 1.2rem;
             font-weight: 700;
-            background: linear-gradient(135deg, #ffd700, #ff6b35);
+            background: linear-gradient(135deg, #ff00ff, #00ffff);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
@@ -81,8 +81,8 @@ CONTACTS_HTML = """
         }
         
         .nav a:hover, .nav a.active {
-            background: rgba(255,215,0,0.1);
-            color: #ffd700;
+            background: rgba(255,0,255,0.1);
+            color: #ff00ff;
         }
         
         /* Main */
@@ -123,13 +123,13 @@ CONTACTS_HTML = """
         }
         
         .btn-primary {
-            background: linear-gradient(135deg, #ffd700, #ff6b35);
+            background: linear-gradient(135deg, #ff00ff, #00ffff);
             color: #000;
         }
         
         .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(255,215,0,0.3);
+            box-shadow: 0 8px 25px rgba(255,0,255,0.3);
         }
         
         .btn-secondary {
@@ -138,7 +138,7 @@ CONTACTS_HTML = """
             border: 1px solid rgba(255,255,255,0.2);
         }
         
-        .btn-success { background: linear-gradient(135deg, #2ed573, #1e90ff); color: #fff; }
+        .btn-success { background: linear-gradient(135deg, #00ffff, #1e90ff); color: #fff; }
         .btn-danger { background: linear-gradient(135deg, #ff4757, #ff3838); color: #fff; }
         
         /* Stats */
@@ -161,7 +161,7 @@ CONTACTS_HTML = """
         .stat-card .value {
             font-size: 2rem;
             font-weight: 700;
-            color: #ffd700;
+            color: #ff00ff;
         }
         .stat-card .label {
             color: #888;
@@ -195,7 +195,7 @@ CONTACTS_HTML = """
         
         .search-box input:focus {
             outline: none;
-            border-color: #ffd700;
+            border-color: #ff00ff;
         }
         
         .search-box::before {
@@ -250,7 +250,7 @@ CONTACTS_HTML = """
         .contact-avatar {
             width: 40px;
             height: 40px;
-            background: linear-gradient(135deg, #ffd700, #ff6b35);
+            background: linear-gradient(135deg, #ff00ff, #00ffff);
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -277,8 +277,8 @@ CONTACTS_HTML = """
         .tag {
             display: inline-block;
             padding: 4px 10px;
-            background: rgba(255,215,0,0.2);
-            color: #ffd700;
+            background: rgba(255,0,255,0.2);
+            color: #ff00ff;
             border-radius: 20px;
             font-size: 0.75rem;
             margin-right: 5px;
@@ -291,9 +291,9 @@ CONTACTS_HTML = """
             font-weight: 600;
         }
         
-        .consent-yes { background: rgba(46, 213, 115, 0.2); color: #2ed573; }
+        .consent-yes { background: rgba(46, 213, 115, 0.2); color: #00ffff; }
         .consent-no { background: rgba(255, 71, 87, 0.2); color: #ff4757; }
-        .consent-pending { background: rgba(255, 165, 2, 0.2); color: #ffa502; }
+        .consent-pending { background: rgba(255, 165, 2, 0.2); color: #00ffff; }
         
         .action-btn {
             padding: 8px 12px;
@@ -307,7 +307,7 @@ CONTACTS_HTML = """
         }
         
         .action-btn:hover {
-            background: rgba(255,215,0,0.2);
+            background: rgba(255,0,255,0.2);
         }
         
         /* Modal */
@@ -328,8 +328,8 @@ CONTACTS_HTML = """
         .modal-overlay.active { display: flex; }
         
         .modal {
-            background: #1a1a2e;
-            border: 1px solid rgba(255,215,0,0.3);
+            background: #150a1a;
+            border: 1px solid rgba(255,0,255,0.3);
             border-radius: 20px;
             width: 90%;
             max-width: 700px;
@@ -386,7 +386,7 @@ CONTACTS_HTML = """
         
         .form-input:focus {
             outline: none;
-            border-color: #ffd700;
+            border-color: #ff00ff;
         }
         
         .form-row {
@@ -416,8 +416,8 @@ CONTACTS_HTML = """
         
         .pagination button:hover,
         .pagination button.active {
-            background: rgba(255,215,0,0.2);
-            border-color: #ffd700;
+            background: rgba(255,0,255,0.2);
+            border-color: #ff00ff;
         }
         
         /* Toast */
@@ -426,7 +426,7 @@ CONTACTS_HTML = """
             bottom: 30px;
             right: 30px;
             padding: 16px 24px;
-            background: #2ed573;
+            background: #00ffff;
             color: #000;
             border-radius: 10px;
             font-weight: 600;
@@ -445,7 +445,7 @@ CONTACTS_HTML = """
             align-items: center;
             gap: 15px;
             padding: 15px 20px;
-            background: rgba(255,215,0,0.1);
+            background: rgba(255,0,255,0.1);
             border-radius: 10px;
             margin-bottom: 20px;
         }
@@ -455,7 +455,7 @@ CONTACTS_HTML = """
         .checkbox {
             width: 20px;
             height: 20px;
-            accent-color: #ffd700;
+            accent-color: #ff00ff;
         }
     </style>
 </head>
@@ -712,7 +712,7 @@ CONTACTS_HTML = """
                         <option value="excel">Excel</option>
                     </select>
                 </div>
-                <div style="background: rgba(255,215,0,0.1); padding: 15px; border-radius: 10px; margin-top: 15px;">
+                <div style="background: rgba(255,0,255,0.1); padding: 15px; border-radius: 10px; margin-top: 15px;">
                     <strong>📋 CSV Format:</strong><br>
                     <small>first_name, last_name, email, phone, company, tags</small>
                 </div>
@@ -758,7 +758,7 @@ CONTACTS_HTML = """
         function showToast(message, type = 'success') {
             const toast = document.createElement('div');
             toast.className = 'toast';
-            toast.style.background = type === 'success' ? '#2ed573' : '#ff4757';
+            toast.style.background = type === 'success' ? '#00ffff' : '#ff4757';
             toast.textContent = message;
             document.body.appendChild(toast);
             setTimeout(() => toast.remove(), 3000);

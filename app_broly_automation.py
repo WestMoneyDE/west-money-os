@@ -225,7 +225,7 @@ BROLY_DASHBOARD_HTML = """
         
         body {
             font-family: 'Segoe UI', system-ui, sans-serif;
-            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            background: linear-gradient(135deg, #0a0a15 0%, #150a1a 50%, #0a0510 100%);
             min-height: 100vh;
             color: #fff;
         }
@@ -240,7 +240,7 @@ BROLY_DASHBOARD_HTML = """
             width: 280px;
             background: rgba(0,0,0,0.4);
             backdrop-filter: blur(20px);
-            border-right: 1px solid rgba(255,215,0,0.2);
+            border-right: 1px solid rgba(255,0,255,0.2);
             padding: 20px;
         }
         
@@ -249,7 +249,7 @@ BROLY_DASHBOARD_HTML = """
             align-items: center;
             gap: 12px;
             padding: 20px 0;
-            border-bottom: 1px solid rgba(255,215,0,0.2);
+            border-bottom: 1px solid rgba(255,0,255,0.2);
             margin-bottom: 20px;
         }
         
@@ -266,7 +266,7 @@ BROLY_DASHBOARD_HTML = """
         .broly-logo-text {
             font-size: 1.5rem;
             font-weight: 700;
-            background: linear-gradient(135deg, #ffd700, #ff6b35);
+            background: linear-gradient(135deg, #ff00ff, #00ffff);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
@@ -284,8 +284,8 @@ BROLY_DASHBOARD_HTML = """
         }
         
         .broly-nav a:hover, .broly-nav a.active {
-            background: linear-gradient(135deg, rgba(255,215,0,0.2), rgba(255,107,53,0.2));
-            color: #ffd700;
+            background: linear-gradient(135deg, rgba(255,0,255,0.2), rgba(0,255,255,0.2));
+            color: #ff00ff;
             transform: translateX(5px);
         }
         
@@ -329,13 +329,13 @@ BROLY_DASHBOARD_HTML = """
         }
         
         .btn-primary {
-            background: linear-gradient(135deg, #ffd700, #ff6b35);
+            background: linear-gradient(135deg, #ff00ff, #00ffff);
             color: #000;
         }
         
         .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(255,215,0,0.3);
+            box-shadow: 0 10px 30px rgba(255,0,255,0.3);
         }
         
         .btn-secondary {
@@ -350,7 +350,7 @@ BROLY_DASHBOARD_HTML = """
         }
         
         .btn-success {
-            background: linear-gradient(135deg, #2ed573, #1e90ff);
+            background: linear-gradient(135deg, #00ffff, #1e90ff);
             color: #fff;
         }
         
@@ -373,7 +373,7 @@ BROLY_DASHBOARD_HTML = """
         
         .stat-card:hover {
             transform: translateY(-5px);
-            border-color: rgba(255,215,0,0.3);
+            border-color: rgba(255,0,255,0.3);
         }
         
         .stat-card .icon {
@@ -384,7 +384,7 @@ BROLY_DASHBOARD_HTML = """
         .stat-card .value {
             font-size: 2.5rem;
             font-weight: 700;
-            background: linear-gradient(135deg, #ffd700, #ff6b35);
+            background: linear-gradient(135deg, #ff00ff, #00ffff);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
@@ -400,7 +400,7 @@ BROLY_DASHBOARD_HTML = """
             margin-top: 8px;
         }
         
-        .stat-card .change.positive { color: #2ed573; }
+        .stat-card .change.positive { color: #00ffff; }
         .stat-card .change.negative { color: #ff4757; }
         
         /* Pipeline */
@@ -444,7 +444,7 @@ BROLY_DASHBOARD_HTML = """
         .stage-contacted { border-color: #a29bfe; }
         .stage-qualified { border-color: #ffeaa7; }
         .stage-proposal { border-color: #fd79a8; }
-        .stage-won { border-color: #2ed573; }
+        .stage-won { border-color: #00ffff; }
         .stage-lost { border-color: #ff4757; }
         
         .pipeline-stage-name {
@@ -493,7 +493,7 @@ BROLY_DASHBOARD_HTML = """
         }
         
         .score-hot { background: #ff4757; color: #fff; }
-        .score-warm { background: #ffa502; color: #000; }
+        .score-warm { background: #00ffff; color: #000; }
         .score-cold { background: #74b9ff; color: #000; }
         
         /* Campaigns Table */
@@ -534,8 +534,8 @@ BROLY_DASHBOARD_HTML = """
             font-weight: 600;
         }
         
-        .status-running { background: #2ed573; color: #000; }
-        .status-paused { background: #ffa502; color: #000; }
+        .status-running { background: #00ffff; color: #000; }
+        .status-paused { background: #00ffff; color: #000; }
         .status-draft { background: #636e72; color: #fff; }
         .status-completed { background: #74b9ff; color: #000; }
         
@@ -556,7 +556,7 @@ BROLY_DASHBOARD_HTML = """
         }
         
         .automation-card:hover {
-            border-color: rgba(255,215,0,0.3);
+            border-color: rgba(255,0,255,0.3);
             transform: translateY(-3px);
         }
         
@@ -615,7 +615,7 @@ BROLY_DASHBOARD_HTML = """
         }
         
         .automation-toggle input:checked + .slider {
-            background: linear-gradient(135deg, #2ed573, #1e90ff);
+            background: linear-gradient(135deg, #00ffff, #1e90ff);
         }
         
         .automation-toggle input:checked + .slider:before {
@@ -637,7 +637,7 @@ BROLY_DASHBOARD_HTML = """
         .automation-stat-value {
             font-size: 1.3rem;
             font-weight: 700;
-            color: #ffd700;
+            color: #ff00ff;
         }
         
         .automation-stat-label {
@@ -663,8 +663,8 @@ BROLY_DASHBOARD_HTML = """
         .modal-overlay.active { display: flex; }
         
         .modal {
-            background: #1a1a2e;
-            border: 1px solid rgba(255,215,0,0.3);
+            background: #150a1a;
+            border: 1px solid rgba(255,0,255,0.3);
             border-radius: 20px;
             width: 90%;
             max-width: 800px;
@@ -727,7 +727,7 @@ BROLY_DASHBOARD_HTML = """
         
         .form-input:focus {
             outline: none;
-            border-color: #ffd700;
+            border-color: #ff00ff;
         }
         
         .form-select {
@@ -775,8 +775,8 @@ BROLY_DASHBOARD_HTML = """
         .tab:hover { color: #fff; }
         
         .tab.active {
-            background: linear-gradient(135deg, rgba(255,215,0,0.2), rgba(255,107,53,0.2));
-            color: #ffd700;
+            background: linear-gradient(135deg, rgba(255,0,255,0.2), rgba(0,255,255,0.2));
+            color: #ff00ff;
         }
         
         .tab-content { display: none; }
@@ -802,7 +802,7 @@ BROLY_DASHBOARD_HTML = """
         .sequence-step-number {
             width: 30px;
             height: 30px;
-            background: linear-gradient(135deg, #ffd700, #ff6b35);
+            background: linear-gradient(135deg, #ff00ff, #00ffff);
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -826,7 +826,7 @@ BROLY_DASHBOARD_HTML = """
         .sequence-connector {
             width: 2px;
             height: 30px;
-            background: linear-gradient(to bottom, #ffd700, transparent);
+            background: linear-gradient(to bottom, #ff00ff, transparent);
             margin-left: 29px;
         }
         
@@ -851,8 +851,8 @@ BROLY_DASHBOARD_HTML = """
         }
         
         .quick-action-card:hover {
-            background: rgba(255,215,0,0.1);
-            border-color: rgba(255,215,0,0.3);
+            background: rgba(255,0,255,0.1);
+            border-color: rgba(255,0,255,0.3);
             transform: translateY(-3px);
         }
         

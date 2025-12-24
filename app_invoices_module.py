@@ -24,7 +24,7 @@ INVOICES_HTML = """
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', system-ui, sans-serif;
-            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            background: linear-gradient(135deg, #0a0a15 0%, #150a1a 50%, #0a0510 100%);
             min-height: 100vh;
             color: #fff;
         }
@@ -45,7 +45,7 @@ INVOICES_HTML = """
         .logo-icon { font-size: 1.8rem; }
         .logo-text {
             font-size: 1.2rem; font-weight: 700;
-            background: linear-gradient(135deg, #ffd700, #ff6b35);
+            background: linear-gradient(135deg, #ff00ff, #00ffff);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
@@ -54,7 +54,7 @@ INVOICES_HTML = """
             padding: 12px 16px; color: #888; text-decoration: none;
             border-radius: 10px; margin-bottom: 5px; transition: all 0.3s;
         }
-        .nav a:hover, .nav a.active { background: rgba(255,215,0,0.1); color: #ffd700; }
+        .nav a:hover, .nav a.active { background: rgba(255,0,255,0.1); color: #ff00ff; }
         .main { flex: 1; padding: 30px; overflow-y: auto; }
         .header {
             display: flex; justify-content: space-between; align-items: center;
@@ -68,17 +68,17 @@ INVOICES_HTML = """
             transition: all 0.3s; display: flex; align-items: center; gap: 8px;
         }
         .btn-primary {
-            background: linear-gradient(135deg, #ffd700, #ff6b35); color: #000;
+            background: linear-gradient(135deg, #ff00ff, #00ffff); color: #000;
         }
         .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(255,215,0,0.3);
+            box-shadow: 0 8px 25px rgba(255,0,255,0.3);
         }
         .btn-secondary {
             background: rgba(255,255,255,0.1); color: #fff;
             border: 1px solid rgba(255,255,255,0.2);
         }
-        .btn-success { background: linear-gradient(135deg, #2ed573, #1e90ff); color: #fff; }
+        .btn-success { background: linear-gradient(135deg, #00ffff, #1e90ff); color: #fff; }
         
         /* Stats */
         .stats-row {
@@ -94,13 +94,13 @@ INVOICES_HTML = """
         .stat-card .icon { font-size: 2rem; margin-bottom: 10px; }
         .stat-card .value {
             font-size: 2rem; font-weight: 700;
-            background: linear-gradient(135deg, #ffd700, #ff6b35);
+            background: linear-gradient(135deg, #ff00ff, #00ffff);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
         .stat-card .label { color: #888; font-size: 0.9rem; margin-top: 5px; }
         .stat-card .change { font-size: 0.85rem; margin-top: 8px; }
-        .stat-card .change.positive { color: #2ed573; }
+        .stat-card .change.positive { color: #00ffff; }
         .stat-card .change.negative { color: #ff4757; }
         
         /* Tabs */
@@ -115,8 +115,8 @@ INVOICES_HTML = """
         }
         .tab:hover { color: #fff; }
         .tab.active {
-            background: linear-gradient(135deg, rgba(255,215,0,0.2), rgba(255,107,53,0.2));
-            color: #ffd700;
+            background: linear-gradient(135deg, rgba(255,0,255,0.2), rgba(0,255,255,0.2));
+            color: #ff00ff;
         }
         
         /* Table */
@@ -139,8 +139,8 @@ INVOICES_HTML = """
             padding: 5px 12px; border-radius: 20px;
             font-size: 0.8rem; font-weight: 600;
         }
-        .status-paid { background: rgba(46, 213, 115, 0.2); color: #2ed573; }
-        .status-pending { background: rgba(255, 165, 2, 0.2); color: #ffa502; }
+        .status-paid { background: rgba(46, 213, 115, 0.2); color: #00ffff; }
+        .status-pending { background: rgba(255, 165, 2, 0.2); color: #00ffff; }
         .status-overdue { background: rgba(255, 71, 87, 0.2); color: #ff4757; }
         .status-draft { background: rgba(99, 110, 114, 0.2); color: #636e72; }
         
@@ -149,7 +149,7 @@ INVOICES_HTML = """
             border: none; border-radius: 8px; color: #fff;
             cursor: pointer; margin-right: 5px; transition: all 0.3s;
         }
-        .action-btn:hover { background: rgba(255,215,0,0.2); }
+        .action-btn:hover { background: rgba(255,0,255,0.2); }
         
         /* Modal */
         .modal-overlay {
@@ -160,7 +160,7 @@ INVOICES_HTML = """
         }
         .modal-overlay.active { display: flex; }
         .modal {
-            background: #1a1a2e; border: 1px solid rgba(255,215,0,0.3);
+            background: #150a1a; border: 1px solid rgba(255,0,255,0.3);
             border-radius: 20px; width: 90%; max-width: 900px;
             max-height: 90vh; overflow-y: auto;
         }
@@ -187,7 +187,7 @@ INVOICES_HTML = """
             border: 1px solid rgba(255,255,255,0.2);
             border-radius: 10px; color: #fff; font-size: 1rem;
         }
-        .form-input:focus { outline: none; border-color: #ffd700; }
+        .form-input:focus { outline: none; border-color: #ff00ff; }
         .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         
         /* Invoice Items */
@@ -207,11 +207,11 @@ INVOICES_HTML = """
         }
         .invoice-total-label { color: #888; }
         .invoice-total-value { font-weight: 600; min-width: 100px; text-align: right; }
-        .invoice-total-value.grand { font-size: 1.3rem; color: #ffd700; }
+        .invoice-total-value.grand { font-size: 1.3rem; color: #ff00ff; }
         
         .toast {
             position: fixed; bottom: 30px; right: 30px;
-            padding: 16px 24px; background: #2ed573; color: #000;
+            padding: 16px 24px; background: #00ffff; color: #000;
             border-radius: 10px; font-weight: 600; z-index: 9999;
         }
     </style>

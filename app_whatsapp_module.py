@@ -28,7 +28,7 @@ WHATSAPP_HTML = """
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', system-ui, sans-serif;
-            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            background: linear-gradient(135deg, #0a0a15 0%, #150a1a 50%, #0a0510 100%);
             min-height: 100vh;
             color: #fff;
         }
@@ -49,7 +49,7 @@ WHATSAPP_HTML = """
         .logo-icon { font-size: 1.8rem; }
         .logo-text {
             font-size: 1.2rem; font-weight: 700;
-            background: linear-gradient(135deg, #25D366, #128C7E);
+            background: linear-gradient(135deg, #00ffff, #ff00ff);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
@@ -58,7 +58,7 @@ WHATSAPP_HTML = """
             padding: 12px 16px; color: #888; text-decoration: none;
             border-radius: 10px; margin-bottom: 5px; transition: all 0.3s;
         }
-        .nav a:hover, .nav a.active { background: rgba(37,211,102,0.1); color: #25D366; }
+        .nav a:hover, .nav a.active { background: rgba(37,211,102,0.1); color: #00ffff; }
         .main { flex: 1; padding: 30px; overflow-y: auto; }
         .header {
             display: flex; justify-content: space-between; align-items: center;
@@ -71,7 +71,7 @@ WHATSAPP_HTML = """
             transition: all 0.3s; display: flex; align-items: center; gap: 8px;
         }
         .btn-primary {
-            background: linear-gradient(135deg, #25D366, #128C7E); color: #fff;
+            background: linear-gradient(135deg, #00ffff, #ff00ff); color: #fff;
         }
         .btn-primary:hover {
             transform: translateY(-2px);
@@ -95,7 +95,7 @@ WHATSAPP_HTML = """
         }
         .stat-card .icon { font-size: 2rem; margin-bottom: 10px; }
         .stat-card .value {
-            font-size: 2rem; font-weight: 700; color: #25D366;
+            font-size: 2rem; font-weight: 700; color: #00ffff;
         }
         .stat-card .label { color: #888; font-size: 0.85rem; margin-top: 5px; }
         
@@ -141,7 +141,7 @@ WHATSAPP_HTML = """
         }
         .chat-item-avatar {
             width: 45px; height: 45px;
-            background: linear-gradient(135deg, #25D366, #128C7E);
+            background: linear-gradient(135deg, #00ffff, #ff00ff);
             border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
             font-weight: 700; color: #fff;
@@ -151,7 +151,7 @@ WHATSAPP_HTML = """
         .chat-item-preview { font-size: 0.85rem; color: #888; }
         .chat-item-time { font-size: 0.75rem; color: #666; }
         .chat-item-badge {
-            background: #25D366;
+            background: #00ffff;
             color: #fff;
             padding: 2px 8px;
             border-radius: 10px;
@@ -183,7 +183,7 @@ WHATSAPP_HTML = """
             margin-bottom: 10px;
         }
         .message.sent {
-            background: linear-gradient(135deg, #25D366, #128C7E);
+            background: linear-gradient(135deg, #00ffff, #ff00ff);
             color: #fff;
             margin-left: auto;
             border-bottom-right-radius: 4px;
@@ -213,10 +213,10 @@ WHATSAPP_HTML = """
             color: #fff;
             font-size: 1rem;
         }
-        .chat-input:focus { outline: none; border-color: #25D366; }
+        .chat-input:focus { outline: none; border-color: #00ffff; }
         .send-btn {
             width: 50px; height: 50px;
-            background: linear-gradient(135deg, #25D366, #128C7E);
+            background: linear-gradient(135deg, #00ffff, #ff00ff);
             border: none;
             border-radius: 50%;
             color: #fff;
@@ -248,7 +248,7 @@ WHATSAPP_HTML = """
             font-size: 1rem;
         }
         .form-textarea { min-height: 120px; resize: vertical; }
-        .form-input:focus, .form-textarea:focus { outline: none; border-color: #25D366; }
+        .form-input:focus, .form-textarea:focus { outline: none; border-color: #00ffff; }
         
         /* Consent Table */
         .consent-table {
@@ -272,9 +272,9 @@ WHATSAPP_HTML = """
             font-size: 0.8rem;
             font-weight: 600;
         }
-        .consent-yes { background: rgba(37,211,102,0.2); color: #25D366; }
+        .consent-yes { background: rgba(37,211,102,0.2); color: #00ffff; }
         .consent-no { background: rgba(255,71,87,0.2); color: #ff4757; }
-        .consent-pending { background: rgba(255,165,2,0.2); color: #ffa502; }
+        .consent-pending { background: rgba(255,165,2,0.2); color: #00ffff; }
         
         /* Modal */
         .modal-overlay {
@@ -285,7 +285,7 @@ WHATSAPP_HTML = """
         }
         .modal-overlay.active { display: flex; }
         .modal {
-            background: #1a1a2e; border: 1px solid rgba(37,211,102,0.3);
+            background: #150a1a; border: 1px solid rgba(37,211,102,0.3);
             border-radius: 20px; width: 90%; max-width: 600px;
             max-height: 90vh; overflow-y: auto;
         }
@@ -316,12 +316,12 @@ WHATSAPP_HTML = """
         }
         .tab:hover { color: #fff; }
         .tab.active {
-            background: rgba(37,211,102,0.2); color: #25D366;
+            background: rgba(37,211,102,0.2); color: #00ffff;
         }
         
         .toast {
             position: fixed; bottom: 30px; right: 30px;
-            padding: 16px 24px; background: #25D366; color: #fff;
+            padding: 16px 24px; background: #00ffff; color: #fff;
             border-radius: 10px; font-weight: 600; z-index: 9999;
         }
     </style>

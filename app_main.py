@@ -217,7 +217,7 @@ DASHBOARD_HTML = """
         
         body {
             font-family: 'Segoe UI', system-ui, sans-serif;
-            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            background: linear-gradient(135deg, #0a0a15 0%, #150a1a 50%, #0a0510 100%);
             min-height: 100vh;
             color: #fff;
         }
@@ -229,7 +229,7 @@ DASHBOARD_HTML = """
             width: 280px;
             background: rgba(0,0,0,0.4);
             backdrop-filter: blur(20px);
-            border-right: 1px solid rgba(255,215,0,0.2);
+            border-right: 1px solid rgba(255,0,255,0.2);
             padding: 20px;
             display: flex;
             flex-direction: column;
@@ -240,7 +240,7 @@ DASHBOARD_HTML = """
             align-items: center;
             gap: 12px;
             padding: 20px 0;
-            border-bottom: 1px solid rgba(255,215,0,0.2);
+            border-bottom: 1px solid rgba(255,0,255,0.2);
             margin-bottom: 25px;
         }
         
@@ -257,7 +257,7 @@ DASHBOARD_HTML = """
         .logo-text {
             font-size: 1.4rem;
             font-weight: 700;
-            background: linear-gradient(135deg, #ffd700, #ff6b35);
+            background: linear-gradient(135deg, #ff00ff, #00ffff);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
@@ -294,14 +294,14 @@ DASHBOARD_HTML = """
         }
         
         .nav a:hover {
-            background: linear-gradient(135deg, rgba(255,215,0,0.1), rgba(255,107,53,0.1));
-            color: #ffd700;
+            background: linear-gradient(135deg, rgba(255,0,255,0.1), rgba(0,255,255,0.1));
+            color: #ff00ff;
             transform: translateX(5px);
         }
         
         .nav a.active {
-            background: linear-gradient(135deg, rgba(255,215,0,0.2), rgba(255,107,53,0.2));
-            color: #ffd700;
+            background: linear-gradient(135deg, rgba(255,0,255,0.2), rgba(0,255,255,0.2));
+            color: #ff00ff;
         }
         
         .nav a .icon { font-size: 1.3rem; }
@@ -328,7 +328,7 @@ DASHBOARD_HTML = """
         .user-avatar {
             width: 45px;
             height: 45px;
-            background: linear-gradient(135deg, #ffd700, #ff6b35);
+            background: linear-gradient(135deg, #ff00ff, #00ffff);
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -361,7 +361,7 @@ DASHBOARD_HTML = """
         
         .greeting strong {
             font-weight: 700;
-            background: linear-gradient(135deg, #ffd700, #ff6b35);
+            background: linear-gradient(135deg, #ff00ff, #00ffff);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
@@ -390,13 +390,13 @@ DASHBOARD_HTML = """
         }
         
         .btn-primary {
-            background: linear-gradient(135deg, #ffd700, #ff6b35);
+            background: linear-gradient(135deg, #ff00ff, #00ffff);
             color: #000;
         }
         
         .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(255,215,0,0.3);
+            box-shadow: 0 10px 30px rgba(255,0,255,0.3);
         }
         
         .btn-secondary {
@@ -424,7 +424,7 @@ DASHBOARD_HTML = """
         
         .stat-card:hover {
             transform: translateY(-5px);
-            border-color: rgba(255,215,0,0.3);
+            border-color: rgba(255,0,255,0.3);
         }
         
         .stat-card-header {
@@ -445,13 +445,13 @@ DASHBOARD_HTML = """
             font-weight: 600;
         }
         
-        .stat-card-change.positive { background: rgba(46, 213, 115, 0.2); color: #2ed573; }
+        .stat-card-change.positive { background: rgba(46, 213, 115, 0.2); color: #00ffff; }
         .stat-card-change.negative { background: rgba(255, 71, 87, 0.2); color: #ff4757; }
         
         .stat-card-value {
             font-size: 2.5rem;
             font-weight: 700;
-            background: linear-gradient(135deg, #ffd700, #ff6b35);
+            background: linear-gradient(135deg, #ff00ff, #00ffff);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
@@ -483,8 +483,8 @@ DASHBOARD_HTML = """
         }
         
         .quick-action:hover {
-            background: rgba(255,215,0,0.1);
-            border-color: rgba(255,215,0,0.3);
+            background: rgba(255,0,255,0.1);
+            border-color: rgba(255,0,255,0.3);
             transform: translateY(-3px);
         }
         
@@ -527,7 +527,7 @@ DASHBOARD_HTML = """
             font-size: 1.3rem;
         }
         
-        .activity-icon.lead { background: rgba(255,215,0,0.2); }
+        .activity-icon.lead { background: rgba(255,0,255,0.2); }
         .activity-icon.email { background: rgba(116,185,255,0.2); }
         .activity-icon.deal { background: rgba(46,213,115,0.2); }
         .activity-icon.call { background: rgba(162,155,254,0.2); }
@@ -815,7 +815,7 @@ LOGIN_HTML = """
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', system-ui, sans-serif;
-            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            background: linear-gradient(135deg, #0a0a15 0%, #150a1a 50%, #0a0510 100%);
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -825,7 +825,7 @@ LOGIN_HTML = """
         .login-container {
             background: rgba(255,255,255,0.05);
             backdrop-filter: blur(20px);
-            border: 1px solid rgba(255,215,0,0.2);
+            border: 1px solid rgba(255,0,255,0.2);
             border-radius: 24px;
             padding: 50px;
             width: 100%;
@@ -839,7 +839,7 @@ LOGIN_HTML = """
         .logo-text {
             font-size: 1.8rem;
             font-weight: 700;
-            background: linear-gradient(135deg, #ffd700, #ff6b35);
+            background: linear-gradient(135deg, #ff00ff, #00ffff);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             margin-top: 10px;
@@ -855,11 +855,11 @@ LOGIN_HTML = """
             color: #fff;
             font-size: 1rem;
         }
-        .form-input:focus { outline: none; border-color: #ffd700; }
+        .form-input:focus { outline: none; border-color: #ff00ff; }
         .btn {
             width: 100%;
             padding: 15px;
-            background: linear-gradient(135deg, #ffd700, #ff6b35);
+            background: linear-gradient(135deg, #ff00ff, #00ffff);
             border: none;
             border-radius: 12px;
             color: #000;
@@ -870,7 +870,7 @@ LOGIN_HTML = """
         }
         .btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(255,215,0,0.3);
+            box-shadow: 0 10px 30px rgba(255,0,255,0.3);
         }
         .error {
             background: rgba(255,71,87,0.2);
@@ -1025,6 +1025,7 @@ def register_all_blueprints():
         ('app_einstein_dedsec', 'dedsec_bp', '🔐 DEDSEC'),
         ('app_settings_tokens', 'settings_bp', '⚙️ SETTINGS'),
         ('app_settings_tokens', 'tokens_bp', '🎮 TOKENS'),
+        ('app_theme_selector', 'theme_bp', '🎨 THEMES'),
     ]
     
     for module_name, bp_name, display_name in modules:

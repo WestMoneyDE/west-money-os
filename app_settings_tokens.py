@@ -28,7 +28,7 @@ SETTINGS_HTML = """
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', system-ui, sans-serif;
-            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            background: linear-gradient(135deg, #0a0a15 0%, #150a1a 50%, #0a0510 100%);
             min-height: 100vh;
             color: #fff;
         }
@@ -49,7 +49,7 @@ SETTINGS_HTML = """
         .logo-icon { font-size: 1.8rem; }
         .logo-text {
             font-size: 1.2rem; font-weight: 700;
-            background: linear-gradient(135deg, #ffd700, #ff6b35);
+            background: linear-gradient(135deg, #ff00ff, #00ffff);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
@@ -58,7 +58,7 @@ SETTINGS_HTML = """
             padding: 12px 16px; color: #888; text-decoration: none;
             border-radius: 10px; margin-bottom: 5px; transition: all 0.3s;
         }
-        .nav a:hover, .nav a.active { background: rgba(255,215,0,0.1); color: #ffd700; }
+        .nav a:hover, .nav a.active { background: rgba(255,0,255,0.1); color: #ff00ff; }
         .main { flex: 1; padding: 30px; overflow-y: auto; }
         .header { margin-bottom: 30px; }
         .title { font-size: 2rem; font-weight: 700; }
@@ -84,8 +84,8 @@ SETTINGS_HTML = """
         }
         .settings-nav-item:hover { background: rgba(255,255,255,0.05); }
         .settings-nav-item.active {
-            background: linear-gradient(135deg, rgba(255,215,0,0.2), rgba(255,107,53,0.2));
-            color: #ffd700;
+            background: linear-gradient(135deg, rgba(255,0,255,0.2), rgba(0,255,255,0.2));
+            color: #ff00ff;
         }
         
         .settings-content {
@@ -111,7 +111,7 @@ SETTINGS_HTML = """
             border: 1px solid rgba(255,255,255,0.2);
             border-radius: 10px; color: #fff; font-size: 1rem;
         }
-        .form-input:focus { outline: none; border-color: #ffd700; }
+        .form-input:focus { outline: none; border-color: #ff00ff; }
         .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         .form-hint { font-size: 0.85rem; color: #666; margin-top: 5px; }
         
@@ -131,7 +131,7 @@ SETTINGS_HTML = """
             cursor: pointer;
             transition: all 0.3s;
         }
-        .toggle.active { background: linear-gradient(135deg, #ffd700, #ff6b35); }
+        .toggle.active { background: linear-gradient(135deg, #ff00ff, #00ffff); }
         .toggle::after {
             content: '';
             width: 22px; height: 22px;
@@ -160,7 +160,7 @@ SETTINGS_HTML = """
         .integration-info { flex: 1; }
         .integration-name { font-weight: 600; font-size: 1.1rem; }
         .integration-status { font-size: 0.85rem; margin-top: 3px; }
-        .integration-status.connected { color: #2ed573; }
+        .integration-status.connected { color: #00ffff; }
         .integration-status.disconnected { color: #ff4757; }
         
         .btn {
@@ -168,14 +168,14 @@ SETTINGS_HTML = """
             font-size: 0.95rem; font-weight: 600; cursor: pointer;
             transition: all 0.3s; display: inline-flex; align-items: center; gap: 8px;
         }
-        .btn-primary { background: linear-gradient(135deg, #ffd700, #ff6b35); color: #000; }
-        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(255,215,0,0.3); }
+        .btn-primary { background: linear-gradient(135deg, #ff00ff, #00ffff); color: #000; }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(255,0,255,0.3); }
         .btn-secondary { background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.2); }
         .btn-danger { background: rgba(255,71,87,0.2); color: #ff4757; border: 1px solid rgba(255,71,87,0.3); }
         
         .toast {
             position: fixed; bottom: 30px; right: 30px;
-            padding: 16px 24px; background: #2ed573; color: #000;
+            padding: 16px 24px; background: #00ffff; color: #000;
             border-radius: 10px; font-weight: 600; z-index: 9999;
         }
     </style>
@@ -461,7 +461,7 @@ TOKENS_HTML = """
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', system-ui, sans-serif;
-            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            background: linear-gradient(135deg, #0a0a15 0%, #150a1a 50%, #0a0510 100%);
             min-height: 100vh;
             color: #fff;
         }
@@ -482,7 +482,7 @@ TOKENS_HTML = """
         .logo-icon { font-size: 1.8rem; }
         .logo-text {
             font-size: 1.2rem; font-weight: 700;
-            background: linear-gradient(135deg, #A855F7, #EC4899);
+            background: linear-gradient(135deg, #ff00ff, #00ffff);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
@@ -491,7 +491,7 @@ TOKENS_HTML = """
             padding: 12px 16px; color: #888; text-decoration: none;
             border-radius: 10px; margin-bottom: 5px; transition: all 0.3s;
         }
-        .nav a:hover, .nav a.active { background: rgba(168,85,247,0.1); color: #A855F7; }
+        .nav a:hover, .nav a.active { background: rgba(168,85,247,0.1); color: #ff00ff; }
         .main { flex: 1; padding: 30px; overflow-y: auto; }
         .header { margin-bottom: 30px; }
         .title { font-size: 2rem; font-weight: 700; }
@@ -519,12 +519,12 @@ TOKENS_HTML = """
         .token-value {
             font-size: 2.5rem;
             font-weight: 700;
-            background: linear-gradient(135deg, #A855F7, #EC4899);
+            background: linear-gradient(135deg, #ff00ff, #00ffff);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
         .token-name { color: #888; margin-top: 5px; }
-        .token-change { font-size: 0.85rem; margin-top: 10px; color: #2ed573; }
+        .token-change { font-size: 0.85rem; margin-top: 10px; color: #00ffff; }
         
         /* Achievements */
         .achievements-grid {
@@ -560,7 +560,7 @@ TOKENS_HTML = """
         }
         .achievement-progress-bar {
             height: 100%;
-            background: linear-gradient(135deg, #A855F7, #EC4899);
+            background: linear-gradient(135deg, #ff00ff, #00ffff);
             border-radius: 4px;
             transition: width 0.5s;
         }
@@ -593,14 +593,14 @@ TOKENS_HTML = """
             display: flex; align-items: center; justify-content: center;
             font-weight: 700;
         }
-        .rank-1 { background: linear-gradient(135deg, #ffd700, #ff6b35); color: #000; }
+        .rank-1 { background: linear-gradient(135deg, #ff00ff, #00ffff); color: #000; }
         .rank-2 { background: linear-gradient(135deg, #c0c0c0, #a0a0a0); color: #000; }
         .rank-3 { background: linear-gradient(135deg, #cd7f32, #b8860b); color: #000; }
         .rank-other { background: rgba(255,255,255,0.1); }
         .leaderboard-user { flex: 1; }
         .leaderboard-name { font-weight: 600; }
         .leaderboard-level { font-size: 0.85rem; color: #888; }
-        .leaderboard-tokens { font-weight: 700; color: #A855F7; }
+        .leaderboard-tokens { font-weight: 700; color: #ff00ff; }
         
         /* Rewards Shop */
         .rewards-grid {
@@ -632,7 +632,7 @@ TOKENS_HTML = """
             background: linear-gradient(135deg, rgba(168,85,247,0.2), rgba(236,72,153,0.2));
             border-radius: 20px;
             font-weight: 600;
-            color: #A855F7;
+            color: #ff00ff;
         }
         
         .btn {
@@ -640,7 +640,7 @@ TOKENS_HTML = """
             font-size: 0.95rem; font-weight: 600; cursor: pointer;
             transition: all 0.3s;
         }
-        .btn-primary { background: linear-gradient(135deg, #A855F7, #EC4899); color: #fff; }
+        .btn-primary { background: linear-gradient(135deg, #ff00ff, #00ffff); color: #fff; }
     </style>
 </head>
 <body>

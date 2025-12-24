@@ -28,7 +28,7 @@ LEADS_HTML = """
         
         body {
             font-family: 'Segoe UI', system-ui, sans-serif;
-            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            background: linear-gradient(135deg, #0a0a15 0%, #150a1a 50%, #0a0510 100%);
             min-height: 100vh;
             color: #fff;
         }
@@ -56,7 +56,7 @@ LEADS_HTML = """
         .logo-text {
             font-size: 1.2rem;
             font-weight: 700;
-            background: linear-gradient(135deg, #ffd700, #ff6b35);
+            background: linear-gradient(135deg, #ff00ff, #00ffff);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
@@ -74,8 +74,8 @@ LEADS_HTML = """
         }
         
         .nav a:hover, .nav a.active {
-            background: rgba(255,215,0,0.1);
-            color: #ffd700;
+            background: rgba(255,0,255,0.1);
+            color: #ff00ff;
         }
         
         .main { flex: 1; padding: 30px; overflow-y: auto; }
@@ -105,13 +105,13 @@ LEADS_HTML = """
         }
         
         .btn-primary {
-            background: linear-gradient(135deg, #ffd700, #ff6b35);
+            background: linear-gradient(135deg, #ff00ff, #00ffff);
             color: #000;
         }
         
         .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(255,215,0,0.3);
+            box-shadow: 0 8px 25px rgba(255,0,255,0.3);
         }
         
         .btn-secondary {
@@ -139,13 +139,13 @@ LEADS_HTML = """
         .stat-card .value {
             font-size: 2.5rem;
             font-weight: 700;
-            background: linear-gradient(135deg, #ffd700, #ff6b35);
+            background: linear-gradient(135deg, #ff00ff, #00ffff);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
         .stat-card .label { color: #888; font-size: 0.9rem; margin-top: 5px; }
         .stat-card .change { font-size: 0.85rem; margin-top: 8px; }
-        .stat-card .change.positive { color: #2ed573; }
+        .stat-card .change.positive { color: #00ffff; }
         .stat-card .change.negative { color: #ff4757; }
         
         /* Tabs */
@@ -170,8 +170,8 @@ LEADS_HTML = """
         
         .tab:hover { color: #fff; }
         .tab.active {
-            background: linear-gradient(135deg, rgba(255,215,0,0.2), rgba(255,107,53,0.2));
-            color: #ffd700;
+            background: linear-gradient(135deg, rgba(255,0,255,0.2), rgba(0,255,255,0.2));
+            color: #ff00ff;
         }
         
         /* Pipeline View */
@@ -203,7 +203,7 @@ LEADS_HTML = """
         .stage-qualified { border-color: #ffeaa7; }
         .stage-proposal { border-color: #fd79a8; }
         .stage-negotiation { border-color: #81ecec; }
-        .stage-won { border-color: #2ed573; }
+        .stage-won { border-color: #00ffff; }
         
         .pipeline-title { font-weight: 600; font-size: 0.9rem; }
         .pipeline-count {
@@ -235,7 +235,7 @@ LEADS_HTML = """
         }
         
         .lead-card.hot { border-left-color: #ff4757; }
-        .lead-card.warm { border-left-color: #ffa502; }
+        .lead-card.warm { border-left-color: #00ffff; }
         .lead-card.cold { border-left-color: #74b9ff; }
         
         .lead-card-header {
@@ -254,14 +254,14 @@ LEADS_HTML = """
         }
         
         .score-high { background: #ff4757; color: #fff; }
-        .score-medium { background: #ffa502; color: #000; }
+        .score-medium { background: #00ffff; color: #000; }
         .score-low { background: #74b9ff; color: #000; }
         
         .lead-card-company { font-size: 0.85rem; color: #888; margin-bottom: 8px; }
         
         .lead-card-value {
             font-size: 0.9rem;
-            color: #2ed573;
+            color: #00ffff;
             font-weight: 600;
         }
         
@@ -324,8 +324,8 @@ LEADS_HTML = """
         .modal-overlay.active { display: flex; }
         
         .modal {
-            background: #1a1a2e;
-            border: 1px solid rgba(255,215,0,0.3);
+            background: #150a1a;
+            border: 1px solid rgba(255,0,255,0.3);
             border-radius: 20px;
             width: 90%;
             max-width: 800px;
@@ -380,7 +380,7 @@ LEADS_HTML = """
         
         .form-input:focus {
             outline: none;
-            border-color: #ffd700;
+            border-color: #ff00ff;
         }
         
         .form-row {
@@ -395,7 +395,7 @@ LEADS_HTML = """
             bottom: 30px;
             right: 30px;
             padding: 16px 24px;
-            background: #2ed573;
+            background: #00ffff;
             color: #000;
             border-radius: 10px;
             font-weight: 600;

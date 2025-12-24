@@ -28,7 +28,7 @@ EINSTEIN_HTML = """
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', system-ui, sans-serif;
-            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            background: linear-gradient(135deg, #0a0a15 0%, #150a1a 50%, #0a0510 100%);
             min-height: 100vh;
             color: #fff;
         }
@@ -97,7 +97,7 @@ EINSTEIN_HTML = """
             -webkit-text-fill-color: transparent;
         }
         .insight-card-change { font-size: 0.9rem; margin-top: 8px; }
-        .insight-card-change.positive { color: #2ed573; }
+        .insight-card-change.positive { color: #00ffff; }
         .insight-card-change.negative { color: #ff4757; }
         .insight-card-desc { color: #888; font-size: 0.9rem; margin-top: 10px; }
         
@@ -153,8 +153,8 @@ EINSTEIN_HTML = """
             font-weight: 600;
         }
         .priority-high { background: #ff4757; color: #fff; }
-        .priority-medium { background: #ffa502; color: #000; }
-        .priority-low { background: #2ed573; color: #000; }
+        .priority-medium { background: #00ffff; color: #000; }
+        .priority-low { background: #00ffff; color: #000; }
         .recommendation-title { font-weight: 600; }
         .recommendation-desc { color: #ccc; font-size: 0.9rem; margin-bottom: 15px; }
         .recommendation-action {
@@ -380,7 +380,7 @@ DEDSEC_HTML = """
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', system-ui, sans-serif;
-            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #0d1117 100%);
+            background: linear-gradient(135deg, #0a0a15 0%, #150a1a 50%, #0d1117 100%);
             min-height: 100vh;
             color: #fff;
         }
@@ -475,7 +475,7 @@ DEDSEC_HTML = """
             font-weight: 600;
         }
         .status-secure { background: rgba(0,255,136,0.2); color: #00ff88; }
-        .status-warning { background: rgba(255,165,2,0.2); color: #ffa502; }
+        .status-warning { background: rgba(255,165,2,0.2); color: #00ffff; }
         .status-danger { background: rgba(255,71,87,0.2); color: #ff4757; }
         .security-card-desc { color: #888; font-size: 0.9rem; }
         

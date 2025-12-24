@@ -23,7 +23,7 @@ AI_CHAT_HTML = """
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', system-ui, sans-serif;
-            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            background: linear-gradient(135deg, #0a0a15 0%, #150a1a 50%, #0a0510 100%);
             min-height: 100vh;
             color: #fff;
         }
@@ -46,7 +46,7 @@ AI_CHAT_HTML = """
         .logo-icon { font-size: 1.8rem; }
         .logo-text {
             font-size: 1.2rem; font-weight: 700;
-            background: linear-gradient(135deg, #8B5CF6, #EC4899);
+            background: linear-gradient(135deg, #ff00ff, #00ffff);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
@@ -55,7 +55,7 @@ AI_CHAT_HTML = """
             padding: 12px 16px; color: #888; text-decoration: none;
             border-radius: 10px; margin-bottom: 5px; transition: all 0.3s;
         }
-        .nav a:hover, .nav a.active { background: rgba(139,92,246,0.1); color: #8B5CF6; }
+        .nav a:hover, .nav a.active { background: rgba(139,92,246,0.1); color: #ff00ff; }
         
         .chat-history {
             flex: 1;
@@ -113,7 +113,7 @@ AI_CHAT_HTML = """
             flex-shrink: 0;
         }
         .message.assistant .message-avatar {
-            background: linear-gradient(135deg, #8B5CF6, #EC4899);
+            background: linear-gradient(135deg, #ff00ff, #00ffff);
         }
         .message.user .message-avatar {
             background: rgba(255,255,255,0.1);
@@ -141,7 +141,7 @@ AI_CHAT_HTML = """
         .typing-indicator.active { display: flex; }
         .typing-dot {
             width: 8px; height: 8px;
-            background: #8B5CF6;
+            background: #ff00ff;
             border-radius: 50%;
             margin-right: 5px;
             animation: typing 1.4s infinite;
@@ -174,12 +174,12 @@ AI_CHAT_HTML = """
             min-height: 56px;
             max-height: 200px;
         }
-        .chat-input:focus { outline: none; border-color: #8B5CF6; }
+        .chat-input:focus { outline: none; border-color: #ff00ff; }
         .chat-input::placeholder { color: #666; }
         
         .send-btn {
             width: 56px; height: 56px;
-            background: linear-gradient(135deg, #8B5CF6, #EC4899);
+            background: linear-gradient(135deg, #ff00ff, #00ffff);
             border: none;
             border-radius: 16px;
             color: #fff;
@@ -211,7 +211,7 @@ AI_CHAT_HTML = """
         .quick-action:hover {
             background: rgba(139,92,246,0.1);
             border-color: rgba(139,92,246,0.3);
-            color: #8B5CF6;
+            color: #ff00ff;
         }
         
         .btn {
@@ -224,7 +224,7 @@ AI_CHAT_HTML = """
             border: 1px solid rgba(255,255,255,0.2);
         }
         .btn-primary {
-            background: linear-gradient(135deg, #8B5CF6, #EC4899); color: #fff;
+            background: linear-gradient(135deg, #ff00ff, #00ffff); color: #fff;
         }
         
         /* Code blocks */

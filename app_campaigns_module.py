@@ -23,7 +23,7 @@ CAMPAIGNS_HTML = """
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', system-ui, sans-serif;
-            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            background: linear-gradient(135deg, #0a0a15 0%, #150a1a 50%, #0a0510 100%);
             min-height: 100vh;
             color: #fff;
         }
@@ -47,7 +47,7 @@ CAMPAIGNS_HTML = """
         .logo-text {
             font-size: 1.2rem;
             font-weight: 700;
-            background: linear-gradient(135deg, #ffd700, #ff6b35);
+            background: linear-gradient(135deg, #ff00ff, #00ffff);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
@@ -63,8 +63,8 @@ CAMPAIGNS_HTML = """
             transition: all 0.3s;
         }
         .nav a:hover, .nav a.active {
-            background: rgba(255,215,0,0.1);
-            color: #ffd700;
+            background: rgba(255,0,255,0.1);
+            color: #ff00ff;
         }
         .main { flex: 1; padding: 30px; overflow-y: auto; }
         .header {
@@ -88,19 +88,19 @@ CAMPAIGNS_HTML = """
             gap: 8px;
         }
         .btn-primary {
-            background: linear-gradient(135deg, #ffd700, #ff6b35);
+            background: linear-gradient(135deg, #ff00ff, #00ffff);
             color: #000;
         }
         .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(255,215,0,0.3);
+            box-shadow: 0 8px 25px rgba(255,0,255,0.3);
         }
         .btn-secondary {
             background: rgba(255,255,255,0.1);
             color: #fff;
             border: 1px solid rgba(255,255,255,0.2);
         }
-        .btn-success { background: linear-gradient(135deg, #2ed573, #1e90ff); color: #fff; }
+        .btn-success { background: linear-gradient(135deg, #00ffff, #1e90ff); color: #fff; }
         .btn-danger { background: linear-gradient(135deg, #ff4757, #ff3838); color: #fff; }
         
         /* Stats */
@@ -121,7 +121,7 @@ CAMPAIGNS_HTML = """
         .stat-card .value {
             font-size: 2rem;
             font-weight: 700;
-            color: #ffd700;
+            color: #ff00ff;
         }
         .stat-card .label { color: #888; font-size: 0.85rem; margin-top: 5px; }
         
@@ -142,7 +142,7 @@ CAMPAIGNS_HTML = """
             transition: all 0.3s;
         }
         .campaign-type-card:hover {
-            border-color: #ffd700;
+            border-color: #ff00ff;
             transform: translateY(-5px);
         }
         .campaign-type-card .icon { font-size: 3rem; margin-bottom: 15px; }
@@ -163,7 +163,7 @@ CAMPAIGNS_HTML = """
             transition: all 0.3s;
         }
         .campaign-card:hover {
-            border-color: rgba(255,215,0,0.3);
+            border-color: rgba(255,0,255,0.3);
             transform: translateY(-3px);
         }
         .campaign-card-header {
@@ -181,8 +181,8 @@ CAMPAIGNS_HTML = """
             font-size: 0.8rem;
             font-weight: 600;
         }
-        .status-running { background: #2ed573; color: #000; }
-        .status-paused { background: #ffa502; color: #000; }
+        .status-running { background: #00ffff; color: #000; }
+        .status-paused { background: #00ffff; color: #000; }
         .status-draft { background: #636e72; color: #fff; }
         .status-completed { background: #74b9ff; color: #000; }
         .status-scheduled { background: #a29bfe; color: #000; }
@@ -200,7 +200,7 @@ CAMPAIGNS_HTML = """
         .campaign-stat-value {
             font-size: 1.3rem;
             font-weight: 700;
-            color: #ffd700;
+            color: #ff00ff;
         }
         .campaign-stat-label {
             font-size: 0.7rem;
@@ -225,7 +225,7 @@ CAMPAIGNS_HTML = """
             cursor: pointer;
             transition: all 0.3s;
         }
-        .action-btn:hover { background: rgba(255,215,0,0.2); }
+        .action-btn:hover { background: rgba(255,0,255,0.2); }
         
         /* Modal */
         .modal-overlay {
@@ -241,8 +241,8 @@ CAMPAIGNS_HTML = """
         }
         .modal-overlay.active { display: flex; }
         .modal {
-            background: #1a1a2e;
-            border: 1px solid rgba(255,215,0,0.3);
+            background: #150a1a;
+            border: 1px solid rgba(255,0,255,0.3);
             border-radius: 20px;
             width: 90%;
             max-width: 900px;
@@ -291,7 +291,7 @@ CAMPAIGNS_HTML = """
         }
         .form-input:focus {
             outline: none;
-            border-color: #ffd700;
+            border-color: #ff00ff;
         }
         .form-row {
             display: grid;
@@ -318,7 +318,7 @@ CAMPAIGNS_HTML = """
         .sequence-step-number {
             width: 35px;
             height: 35px;
-            background: linear-gradient(135deg, #ffd700, #ff6b35);
+            background: linear-gradient(135deg, #ff00ff, #00ffff);
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -330,7 +330,7 @@ CAMPAIGNS_HTML = """
         .sequence-connector {
             width: 2px;
             height: 25px;
-            background: linear-gradient(to bottom, #ffd700, transparent);
+            background: linear-gradient(to bottom, #ff00ff, transparent);
             margin-left: 32px;
         }
         
@@ -353,7 +353,7 @@ CAMPAIGNS_HTML = """
             bottom: 30px;
             right: 30px;
             padding: 16px 24px;
-            background: #2ed573;
+            background: #00ffff;
             color: #000;
             border-radius: 10px;
             font-weight: 600;
@@ -705,7 +705,7 @@ West Money Bau"></textarea>
         
         // Tag styling
         document.querySelectorAll('.tag').forEach(tag => {
-            tag.style.cssText = 'display: inline-block; padding: 6px 12px; background: rgba(255,215,0,0.2); color: #ffd700; border-radius: 20px; font-size: 0.85rem; cursor: pointer; transition: all 0.3s;';
+            tag.style.cssText = 'display: inline-block; padding: 6px 12px; background: rgba(255,0,255,0.2); color: #ff00ff; border-radius: 20px; font-size: 0.85rem; cursor: pointer; transition: all 0.3s;';
         });
     </script>
 </body>

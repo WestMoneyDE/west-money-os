@@ -1,0 +1,115 @@
+<svg width="800" height="500" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgCyber" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0a0a15"/>
+      <stop offset="50%" style="stop-color:#150a1a"/>
+      <stop offset="100%" style="stop-color:#0a0510"/>
+    </linearGradient>
+    <linearGradient id="neonGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#ff00ff"/>
+      <stop offset="100%" style="stop-color:#00ffff"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="800" height="500" fill="url(#bgCyber)"/>
+  
+  <!-- Grid lines for cyberpunk effect -->
+  <g stroke="rgba(255,0,255,0.1)" stroke-width="1">
+    <line x1="0" y1="100" x2="800" y2="100"/>
+    <line x1="0" y1="200" x2="800" y2="200"/>
+    <line x1="0" y1="300" x2="800" y2="300"/>
+    <line x1="0" y1="400" x2="800" y2="400"/>
+    <line x1="200" y1="0" x2="200" y2="500"/>
+    <line x1="400" y1="0" x2="400" y2="500"/>
+    <line x1="600" y1="0" x2="600" y2="500"/>
+  </g>
+  
+  <!-- Header -->
+  <rect x="0" y="0" width="800" height="70" fill="rgba(0,0,0,0.5)"/>
+  <line x1="0" y1="70" x2="800" y2="70" stroke="url(#neonGrad)" stroke-width="2"/>
+  
+  <!-- Logo -->
+  <text x="30" y="45" font-size="28">🔐</text>
+  <text x="70" y="48" font-family="Arial Black" font-size="24" fill="url(#neonGrad)" filter="url(#glow)">WEST MONEY OS</text>
+  <text x="310" y="48" font-family="Arial" font-size="14" fill="#ff00ff">CYBERPUNK EDITION</text>
+  
+  <!-- Navigation -->
+  <text x="500" y="45" font-family="Arial" font-size="13" fill="#ff00ff">📊 Dashboard</text>
+  <text x="600" y="45" font-family="Arial" font-size="13" fill="#666">🐉 Broly</text>
+  <text x="680" y="45" font-family="Arial" font-size="13" fill="#666">📧 Kampagnen</text>
+  
+  <!-- Stats Cards -->
+  <g>
+    <!-- Card 1 -->
+    <rect x="30" y="100" width="170" height="120" rx="16" fill="rgba(255,0,255,0.1)" stroke="rgba(255,0,255,0.3)" stroke-width="1"/>
+    <text x="115" y="140" font-size="28" text-anchor="middle">👥</text>
+    <text x="115" y="180" font-family="Arial Black" font-size="32" fill="#00ffff" text-anchor="middle" filter="url(#glow)">1,234</text>
+    <text x="115" y="205" font-family="Arial" font-size="12" fill="#888" text-anchor="middle">Kontakte</text>
+    
+    <!-- Card 2 -->
+    <rect x="220" y="100" width="170" height="120" rx="16" fill="rgba(255,0,255,0.1)" stroke="rgba(255,0,255,0.3)" stroke-width="1"/>
+    <text x="305" y="140" font-size="28" text-anchor="middle">🎯</text>
+    <text x="305" y="180" font-family="Arial Black" font-size="32" fill="#00ffff" text-anchor="middle" filter="url(#glow)">89</text>
+    <text x="305" y="205" font-family="Arial" font-size="12" fill="#888" text-anchor="middle">Hot Leads</text>
+    
+    <!-- Card 3 -->
+    <rect x="410" y="100" width="170" height="120" rx="16" fill="rgba(255,0,255,0.1)" stroke="rgba(255,0,255,0.3)" stroke-width="1"/>
+    <text x="495" y="140" font-size="28" text-anchor="middle">💰</text>
+    <text x="495" y="180" font-family="Arial Black" font-size="32" fill="#00ffff" text-anchor="middle" filter="url(#glow)">€847K</text>
+    <text x="495" y="205" font-family="Arial" font-size="12" fill="#888" text-anchor="middle">Umsatz</text>
+    
+    <!-- Card 4 -->
+    <rect x="600" y="100" width="170" height="120" rx="16" fill="rgba(255,0,255,0.1)" stroke="rgba(255,0,255,0.3)" stroke-width="1"/>
+    <text x="685" y="140" font-size="28" text-anchor="middle">📧</text>
+    <text x="685" y="180" font-family="Arial Black" font-size="32" fill="#00ffff" text-anchor="middle" filter="url(#glow)">45.2%</text>
+    <text x="685" y="205" font-family="Arial" font-size="12" fill="#888" text-anchor="middle">Open Rate</text>
+  </g>
+  
+  <!-- Recent Activity Panel -->
+  <rect x="30" y="250" width="360" height="220" rx="16" fill="rgba(0,0,0,0.3)" stroke="rgba(255,0,255,0.2)" stroke-width="1"/>
+  <text x="50" y="285" font-family="Arial" font-size="16" fill="#ff00ff" font-weight="bold">🔥 Letzte Aktivitäten</text>
+  
+  <text x="50" y="320" font-family="Arial" font-size="13" fill="#fff">📧 E-Mail an Max Mustermann gesendet</text>
+  <text x="50" y="340" font-family="Arial" font-size="11" fill="#666">vor 5 Minuten</text>
+  
+  <text x="50" y="375" font-family="Arial" font-size="13" fill="#fff">🎯 Neuer Lead: Lisa Bauer (Score: 87)</text>
+  <text x="50" y="395" font-family="Arial" font-size="11" fill="#666">vor 12 Minuten</text>
+  
+  <text x="50" y="430" font-family="Arial" font-size="13" fill="#fff">💰 Rechnung RE-2024-0156 bezahlt</text>
+  <text x="50" y="450" font-family="Arial" font-size="11" fill="#666">vor 1 Stunde</text>
+  
+  <!-- Quick Actions Panel -->
+  <rect x="410" y="250" width="360" height="220" rx="16" fill="rgba(0,0,0,0.3)" stroke="rgba(0,255,255,0.2)" stroke-width="1"/>
+  <text x="430" y="285" font-family="Arial" font-size="16" fill="#00ffff" font-weight="bold">⚡ Quick Actions</text>
+  
+  <!-- Action Buttons -->
+  <rect x="430" y="305" width="150" height="40" rx="8" fill="url(#neonGrad)"/>
+  <text x="505" y="332" font-family="Arial" font-size="13" fill="#000" text-anchor="middle" font-weight="bold">🐉 Broly Start</text>
+  
+  <rect x="600" y="305" width="150" height="40" rx="8" fill="rgba(255,0,255,0.2)" stroke="rgba(255,0,255,0.5)"/>
+  <text x="675" y="332" font-family="Arial" font-size="13" fill="#ff00ff" text-anchor="middle">📧 Kampagne</text>
+  
+  <rect x="430" y="360" width="150" height="40" rx="8" fill="rgba(0,255,255,0.2)" stroke="rgba(0,255,255,0.5)"/>
+  <text x="505" y="387" font-family="Arial" font-size="13" fill="#00ffff" text-anchor="middle">💬 WhatsApp</text>
+  
+  <rect x="600" y="360" width="150" height="40" rx="8" fill="rgba(255,0,255,0.2)" stroke="rgba(255,0,255,0.5)"/>
+  <text x="675" y="387" font-family="Arial" font-size="13" fill="#ff00ff" text-anchor="middle">🤖 AI Chat</text>
+  
+  <rect x="430" y="415" width="150" height="40" rx="8" fill="rgba(0,255,255,0.2)" stroke="rgba(0,255,255,0.5)"/>
+  <text x="505" y="442" font-family="Arial" font-size="13" fill="#00ffff" text-anchor="middle">💰 Rechnung</text>
+  
+  <rect x="600" y="415" width="150" height="40" rx="8" fill="rgba(255,0,255,0.2)" stroke="rgba(255,0,255,0.5)"/>
+  <text x="675" y="442" font-family="Arial" font-size="13" fill="#ff00ff" text-anchor="middle">🔐 DedSec</text>
+  
+  <!-- Decorative elements -->
+  <circle cx="750" cy="30" r="8" fill="#ff00ff" opacity="0.5"/>
+  <circle cx="770" cy="30" r="8" fill="#00ffff" opacity="0.5"/>
+</svg>
