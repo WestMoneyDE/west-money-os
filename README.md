@@ -1,131 +1,87 @@
-# 🔥 WEST MONEY OS v15.369 - ULTIMATE EDITION
+# 🚀 WEST MONEY OS v15.369 - ULTIMATE EDITION
 
-**Enterprise Universe GmbH** | CEO: Ömer Hüseyin Coşkun  
-**Launch Date:** 01.01.2026
+**Enterprise Universe GmbH | CEO: Ömer Hüseyin Coşkun**  
+**Launch: 01.01.2026**
 
----
+## ✅ Features
 
-## 📋 Features
+### 📊 Dashboard & CRM
+- **Leads Management** - 10 echte Leads aus Transcripts (Thomas Moser, Loxone, Mainova AG, etc.)
+- **Kontakte** - HubSpot CRM Integration
+- **Projekte** - 6 echte Projekte (Villa Müller, Bürokomplex TechPark, etc.)
 
-### Main Modules
-- **Dashboard** - Live KPIs, Pipeline Overview, Activity Feed
-- **Lead Management** - HubSpot Sync, Scoring, Stages
-- **Contacts** - CRM Integration, WhatsApp Consent
-- **Projects** - Bauprojekte, Smart Home, LOXONE/KNX
-- **Invoices** - SevDesk Integration
-
-### Einstein AI
-- **Predictions** - ML-basierte Lead Scoring
-- **Analytics** - Deep Learning Datenanalyse  
+### 🧠 Einstein AI
+- **Predictions** - KI-basierte Prognosen (87% Conversion, Deal Close, Upsell)
+- **Analytics** - Deep Learning Analyse
 - **Insights** - Automatische Empfehlungen
 
-### Photovoltaik ☀️
-- **PV Home** - Solar Dashboard
-- **Partner** - 1Komma5°, Enpal, Zolar, Solarwatt
-- **PV Rechner** - ROI & Amortisation
+### ☀️ Photovoltaik Modul
+- **PV Partner** - 1Komma5°, Enpal, Zolar, Solarwatt
+- **PV Rechner** - ROI & Amortisation berechnen
+- **PV Projekte** - Solar-Installationen verwalten
 
-### DedSec Security 🛡️
-- **Security Hub** - System Status
+### 🛡️ DedSec Security
 - **Command Tower** - Zentrale Überwachung
-- **Drone Control** - Patrol Drones
-- **CCTV Network** - 24 Kameras
+- **Drone Control** - Autonome Patrouille
+- **CCTV Network** - 24 Kameras live
 
-### Tools
-- **WhatsApp Business** - Kommunikation & Kampagnen
-- **Consent Manager** - Bulk-Update Einwilligungen
-- **GOD BOT AI** - Claude-powered Assistant
-- **Private Locker** - Dokumenten-Ablage
+### 💬 WhatsApp Consent Manager
+**Bulk-Update für Einwilligungen gemäß [HubSpot Dokumentation](https://knowledge.hubspot.com/de/inbox/edit-the-whatsapp-consent-status-of-your-contacts-in-bulk)**
+- Alle Kontakte auswählen
+- Consent erteilen / widerrufen
+- Bulk-Update über HubSpot API
 
----
+### 🤖 GOD BOT AI
+- Claude AI Integration
+- Ultra Instinct AI Assistant
+- Professionelle Antworten auf Deutsch
 
-## 🚀 Quick Start
+## 🔧 API Integrationen
+
+| Service | Status | Funktion |
+|---------|--------|----------|
+| **HubSpot CRM** | ✅ Konfiguriert | Kontakte, Deals, WhatsApp Consent |
+| **Stripe** | ✅ Konfiguriert | Zahlungen, Balance |
+| **SevDesk** | ✅ Konfiguriert | Rechnungen, Buchhaltung |
+| **Claude AI** | ⏳ API Key erforderlich | GOD BOT |
+
+## 📦 Installation
 
 ```bash
-# Clone/Copy files
-cd /var/www/west-money-os
-
-# Setup Python
+# 1. Python venv erstellen
 python3 -m venv venv
 source venv/bin/activate
+
+# 2. Dependencies installieren
 pip install -r requirements.txt
 
-# Configure
-cp .env.example .env
-nano .env  # Add your API keys
-
-# Run
-python app.py
+# 3. App starten
+python westmoney_ultimate.py
 ```
 
----
+## 🔐 Login
 
-## ⚙️ Configuration
+- **URL:** http://localhost:5000
+- **Benutzer:** admin
+- **Passwort:** 663724!
 
-Edit `.env` file:
+## 📁 Dateien
 
-```env
-HUBSPOT_API_KEY=pat-eu1-xxxxx
-STRIPE_SECRET_KEY=sk_live_xxxxx
-SEVDESK_API_KEY=xxxxx
-ANTHROPIC_API_KEY=sk-ant-xxxxx
-WHATSAPP_TOKEN=xxxxx
-```
+- `westmoney_ultimate.py` - Hauptanwendung
+- `.env` - API Keys (HubSpot, Stripe, SevDesk)
+- `requirements.txt` - Python Dependencies
+- `deploy.sh` - Deployment Script für Server
 
----
-
-## 🖥️ Server Deployment
+## 🌐 Server Deployment
 
 ```bash
-# Copy service file
-sudo cp westmoney.service /etc/systemd/system/
-
-# Enable & Start
-sudo systemctl daemon-reload
-sudo systemctl enable westmoney
-sudo systemctl start westmoney
-
-# Check status
-sudo systemctl status westmoney
+# Auf Server 81.88.26.204 deployen
+./deploy.sh
 ```
 
----
-
-## 🔐 Default Login
-
-- **Username:** admin
-- **Password:** admin123
+**Live URL:** http://west-money.com
 
 ---
 
-## 📡 API Endpoints
-
-| Endpoint | Description |
-|----------|-------------|
-| `/api/v1/health` | Health Check |
-| `/api/v1/stats` | System Stats |
-| `/api/sync/hubspot` | Sync HubSpot |
-| `/api/sync/stripe` | Sync Stripe |
-| `/api/sync/sevdesk` | Sync SevDesk |
-| `/api/whatsapp/consent/bulk` | Bulk Consent Update |
-| `/api/godbot/chat` | GOD BOT AI Chat |
-
----
-
-## 🏗️ Tech Stack
-
-- **Backend:** Python Flask
-- **Database:** SQLite
-- **Frontend:** Vanilla JS, Chart.js
-- **APIs:** HubSpot, Stripe, SevDesk, Claude AI, WhatsApp
-
----
-
-## 📞 Support
-
-**West Money Bau**  
-Enterprise Universe GmbH  
-CEO: Ömer Hüseyin Coşkun
-
----
-
-*Powered by GOD MODE ∞ Ultra Instinct* 🤖
+**West Money OS v15.369 - ULTIMATE EDITION**  
+*Enterprise Universe GmbH © 2024-2026*
